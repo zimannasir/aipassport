@@ -16,7 +16,7 @@ try:
     f.key('C');f.key('B');f.shot(out,'before-exchange')
     before=f.state()['party'];f.key('C');f.cmd('save_fail 1');f.key('C')
     assert f.state()['party']==before and f.state()['box_count']==2
-    assert '保存失败' in f.state()['party_view']['feedback'];f.shot(out,'save-failure')
+    assert 'Save failed' in f.state()['party_view']['feedback'];f.shot(out,'save-failure')
     f.key('C');assert f.state()['pet']==133 and f.state()['box_count']==2
     assert f.state()['party_count']==6;f.shot(out,'exchanged')
     f.key('C');f.shot(out,'duplicate-individuals');f.key('C');f.key('C')

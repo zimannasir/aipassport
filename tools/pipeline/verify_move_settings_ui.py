@@ -30,12 +30,12 @@ try:
  cmd('boot 12 76 60 143 3 1 0 0 1');open_moves();n=v()['skill_count'];assert v()['skill_enabled_count']==n
  move_to(153);shot('explosion-enabled');key('C');assert not v()['skill_enabled'] and v()['skill_enabled_count']==n-1
  shot('explosion-disabled');key('B',True);assert not v()['skills'];key('C');assert v()['skills'];move_to(153);assert not v()['skill_enabled']
- cmd('save_fail 1');key('C');assert not v()['skill_enabled'] and v()['feedback']=='保存失败 请重试';shot('save-error')
+ cmd('save_fail 1');key('C');assert not v()['skill_enabled'] and v()['feedback']=='Save failed. Retry';shot('save-error')
  key('C');assert v()['skill_enabled'];move_to(0);key('C');assert v()['skill_enabled_count']==n
  # Leave just one learned move. C cannot uncheck the final one.
  move_to(5)
  for _ in range(n-1):key('C');key('B')
- assert v()['skill_enabled_count']==1;key('C');assert v()['feedback']=='至少保留一招';assert v()['skill_enabled_count']==1;shot('last-move')
+ assert v()['skill_enabled_count']==1;key('C');assert v()['feedback']=='Keep at least one move';assert v()['skill_enabled_count']==1;shot('last-move')
  move_to(0);key('C');assert v()['skill_enabled_count']==n;shot('all-enabled')
  key('B',True);key('B',True);assert not v()['details']
  # A second individual starts with its own default policy.

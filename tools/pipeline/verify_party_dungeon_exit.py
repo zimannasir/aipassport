@@ -57,7 +57,7 @@ def assert_exchanged(r):
     assert state['level'] == 40
     assert state['box_count'] == 1
     assert not state['party_view']['box']
-    assert state['party_view']['feedback'] == '队伍已更换'
+    assert state['party_view']['feedback'] == 'Party updated'
 
 
 r = setup()
@@ -99,7 +99,7 @@ for fail_after in (0, 1):
         key(r, 2)
         state = r.inspect()
         assert state['party'] == before['party']
-        assert '保存失败' in state['party_view']['feedback']
+        assert 'Save failed' in state['party_view']['feedback']
         shot(r, f'save-failure-{fail_after}')
         if fail_after == 0:
             assert state['dungeon'] == before['dungeon']

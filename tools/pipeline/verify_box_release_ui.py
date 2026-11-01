@@ -44,10 +44,10 @@ try:
  key('C');assert state()['box_release']['choice']==0;key('B');key('B',True)
  assert not state()['box_release']['confirm'] and state()['box_count']==4
  key('C');key('B');cmd('save_fail 1');key('C')
- assert state()['box_release']['confirm'] and view()['feedback']=='保存失败 请重试' and state()['box_count']==4
+ assert state()['box_release']['confirm'] and view()['feedback']=='Save failed. Retry' and state()['box_count']==4
  shot('release-save-failure');key('C')
  assert not state()['box_release']['confirm'] and not view()['details'] and state()['box_count']==3
- assert state()['party']==before['party'];assert view()['feedback']=='伙伴已放生';shot('released')
+ assert state()['party']==before['party'];assert view()['feedback']=='Pokemon released';shot('released')
  # Remove remaining entries, including shiny prompt and final empty warehouse.
  for remaining in (3,2,1):
   prompt()

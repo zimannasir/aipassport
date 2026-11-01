@@ -15,7 +15,7 @@ def catalog(root):
   (p/'assets.S').write_text('\n'.join(assembly)+'\n')
   source=root/'firmware/main';development='exploration_visitors(' in (source/'exploration.c').read_text()
   johto=(source/'johto.c').exists()
-  files=['assets.c','pokemon_names.c','exploration.c','items.c','encounter.c','nurture.c','party.c','trainer.c','combat.c','battle.c','exp.c','evolution.c','achievements.c']
+  files=['assets.c','pokemon_names.c','english_names.c','exploration.c','items.c','encounter.c','nurture.c','party.c','trainer.c','combat.c','battle.c','exp.c','evolution.c','achievements.c']
   if johto:files+=['johto.c','johto_routes.c','johto_story.c','johto_activity.c','gym_rules.c']
   command=['cc','-std=gnu11','-DHOST_BUILD','-O1','-ffunction-sections','-fdata-sections','-I',str(source),'-I',str(p),str(ROOT/'tools/pipeline/guide_catalog.c'),str(p/'assets.S')]+[str(source/f) for f in files]+['-lz',('-Wl,-dead_strip' if sys.platform=='darwin' else '-Wl,--gc-sections'),'-o',str(p/'catalog')]
   if johto:command.insert(1,'-DGUIDE_JOHTO')
@@ -36,7 +36,7 @@ def catalog(root):
   pools=json.loads(re.search(r'POOLS\[4\]\[5\]\[16\]=\s*(\{.*?\});',(source/'exploration.c').read_text(),re.S).group(1).replace('{','[').replace('}',']'))
   for i in range(4):data['maps'][i]['pool']=sum(pools[i],[])
   data['cards']=list(zip(*[re.findall(r'"([^"]+)"',re.search(r'dungeon_'+key+r'\[DUNGEON_CARD_COUNT\]=\{(.*?)\};',(source/'dungeon.c').read_text(),re.S).group(1)) for key in ('cards','desc')]))
-  data['features']={'expandedWarehouse':(source/'save_bank.h').exists(),'careEvents':development,'shinyEntry':(source/'shiny_entry.c').exists(),'nostalgicMoves':'pokemon_move_names_override' in (source/'pokemon_names.c').read_text(),'moveSettings':(source/'move_policy.h').exists(),'boxRelease':'world_box_release' in (source/'world.c').read_text(),'importStageDiagnostics':'world_backup_validate' in (source/'world.c').read_text(),'compressedSave':(source/'save_storage.h').exists()}
+  data['features']={'expandedWarehouse':(source/'save_bank.h').exists(),'careEvents':development,'shinyEntry':(source/'shiny_entry.c').exists(),'nostalgicMoves':'pokemon_move_names_override' in (source/'pokemon_names.c','english_names.c').read_text(),'moveSettings':(source/'move_policy.h').exists(),'boxRelease':'world_box_release' in (source/'world.c').read_text(),'importStageDiagnostics':'world_backup_validate' in (source/'world.c').read_text(),'compressedSave':(source/'save_storage.h').exists()}
   data['sourceHashes']={str(f.relative_to(root)):hashlib.sha256(f.read_bytes()).hexdigest() for f in sorted(source.glob('*')) if f.suffix in ('.c','.h')}
   data['features']['johto']=johto
   data['features']['radarMaps']=field

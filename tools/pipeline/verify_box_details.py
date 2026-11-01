@@ -25,7 +25,7 @@ try:
     f.key('B',True);assert f.state()['party_view']['box_row']==1
     f.key('A');f.key('C');assert f.state()['party_view']['species']==25
     f.cmd('save_fail 1');f.key('C')
-    assert f.state()['party']==before and '保存失败' in f.state()['party_view']['feedback']
+    assert f.state()['party']==before and 'Save failed' in f.state()['party_view']['feedback']
     assert f.state()['party_view']['details'];f.shot(out,'save-failure')
     f.key('C');assert not f.state()['party_view']['box']
     assert f.state()['party'][0]['flags']==1 and f.state()['level']==40

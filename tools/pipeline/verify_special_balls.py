@@ -24,8 +24,8 @@ int main(void) {
     c.pet_level=20;assert(cap_ball_factor_1000(CAP_BALL_LEVEL,&c)==1000);
     c.wild_level=0;assert(cap_ball_factor_1000(CAP_BALL_LEVEL,&c)==1000);
     assert(cap_ball_factor_1000(CAP_BALL_LEVEL,NULL)==1000);
-    assert(!strcmp(cap_ball_name((cap_ball_t)-1),"精灵球"));
-    assert(!strcmp(cap_ball_name(CAP_BALL_FRIEND),"友友球"));
+    assert(!strcmp(cap_ball_name((cap_ball_t)-1),"Poke Ball"));
+    assert(!strcmp(cap_ball_name(CAP_BALL_FRIEND),"Friend Ball"));
     unsigned checks=13;
     // Independent expected numbers, before any large grid comparisons.
     c=(cap_context_t){.pet_level=40,.wild_level=20,.wild_speed=100,.wild_weight_hg=2000};
