@@ -15,40 +15,40 @@ typedef struct {
 
 static const opening_box_t SCRIPT[OPENING_BOXES] = {
     {
-        .lines = {"你好！", "欢迎来到", "宝可梦的世界！"},
+        .lines = {"Hello!", "Welcome to", "the world of Pokemon!"},
         .line_count = 3,
         .show_oak = true,
     },
     {
-        .lines = {"我叫大木", "人们都叫我", "宝可梦博士"},
+        .lines = {"My name is Oak.", "People call me", "the Pokemon Prof."},
         .line_count = 3,
         .show_oak = true,
     },
     {
-        .lines = {"这个世界里", "生活着一种", "被称为宝可梦的生物"},
-        .line_count = 3,
-        .show_oak = true,
-        .show_mon = 25,
-    },
-    {
-        .lines = {"有人把它们当作伙伴", "也有人", "让它们互相切磋"},
+        .lines = {"This world is", "inhabited by", "creatures called Pokemon!"},
         .line_count = 3,
         .show_oak = true,
         .show_mon = 25,
     },
     {
-        .lines = {"而我", "把研究宝可梦", "当作毕生的事业"},
+        .lines = {"Some keep them as pets,", "while others", "battle them for sport."},
+        .line_count = 3,
+        .show_oak = true,
+        .show_mon = 25,
+    },
+    {
+        .lines = {"As for myself,", "I study Pokemon", "as my life's work."},
         .line_count = 3,
         .show_oak = true,
         .pause_after = 20,
     },
     {
-        .lines = {"你的宝可梦传奇", "就要开始了！"},
+        .lines = {"Your own Pokemon legend", "is about to unfold!"},
         .line_count = 2,
         .show_oak = true,
     },
     {
-        .lines = {"一个充满", "梦想与冒险的世界", "正在等着你", "出发吧！"},
+        .lines = {"A world of", "dreams and adventures", "awaits you!", "Let's go!"},
         .line_count = 4,
     },
 };

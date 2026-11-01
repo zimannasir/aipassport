@@ -21,7 +21,7 @@ void battery_ui_set_redraw(void (*redraw)(void)) { status_redraw = redraw; }
 
 void battery_ui_playtime_text(char *out, size_t size)
 {
-    snprintf(out, size, "时长 %lu:%02lu", (unsigned long)(playtime_minutes / 60),
+    snprintf(out, size, "Time %lu:%02lu", (unsigned long)(playtime_minutes / 60),
              (unsigned long)(playtime_minutes % 60));
 }
 

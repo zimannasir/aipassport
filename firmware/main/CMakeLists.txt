@@ -14,6 +14,7 @@ idf_component_register(
          "ui_pixel_math.c"
          "assets.c"
          "pokemon_names.c"
+         "english_names.c"
          "sensing.c"
          "nurture.c"
          "items.c"

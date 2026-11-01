@@ -53,11 +53,11 @@ static box_view_options_t s_box_options;
 enum { BOX_MENU_CLOSED, BOX_MENU_OPTIONS, BOX_MENU_FILTER, BOX_MENU_TYPE, BOX_MENU_SORT };
 static unsigned s_box_menu, s_box_menu_row;
 static bool s_box_paging;
-static const char *const s_box_filters[] = {"全部", "闪光", "可进化"};
-static const char *const s_box_sorts[] = {"图鉴编号", "等级从高到低", "等级从低到高"};
+static const char *const s_box_filters[] = {"All", "Shiny", "Can evolve"};
+static const char *const s_box_sorts[] = {"Dex number", "Level high-low", "Level low-high"};
 static const char *const s_box_types[] = {
-    "不限", "一般", "火", "水", "电", "草", "冰", "格斗", "毒", "地面",
-    "飞行", "超能力", "虫", "岩石", "幽灵", "龙", "恶", "钢"
+    "Any", "Normal", "Fire", "Water", "Electric", "Grass", "Ice", "Fighting", "Poison", "Ground",
+    "Flying", "Psychic", "Bug", "Rock", "Ghost", "Dragon", "Dark", "Steel"
 };
 _Static_assert(sizeof(s_box_types) / sizeof(s_box_types[0]) == BATTLE_TYPE_COUNT + 1, "box types");
 static char s_feedback[72];
@@ -117,12 +117,12 @@ static void draw_list(int band_y)
 {
     char text[64], name[48];
     snprintf(text, sizeof(text), "%u/%u", s_party.count, PARTY_MAX);
-    game_ui_title(band_y, "队伍", text);
+    game_ui_title(band_y, "Party", text);
     unsigned highest=1;for(unsigned i=0;i<s_party.count;i++)if(s_party.members[i].level>highest)highest=s_party.members[i].level;
     for (unsigned index = 0; index < PARTY_MAX; index++) {
         int y = ROW_Y + index * ROW_H;
         if (index >= s_party.count) {
-            render_text(64, y + 10 - band_y, "空位", GAME_UI_MUTED);
+            render_text(64, y + 10 - band_y, "Empty", GAME_UI_MUTED);
             continue;
         }
         const mon_t *member = &s_party.members[index];
@@ -133,14 +133,14 @@ static void draw_list(int band_y)
         render_text(text_x, y + 2 - band_y, name, GAME_UI_INK);
         snprintf(text, sizeof(text), "Lv%u", member->level);
         render_text(228 - render_text_width(text), y + 2 - band_y, text, GAME_UI_INK);
-        if(index)snprintf(text,sizeof(text),"分享%u%%",exp_party_percent(member->level,highest,false));
-        else snprintf(text,sizeof(text),"亲密 %u",member->intimacy);
+        if(index)snprintf(text,sizeof(text),"Share %u%%",exp_party_percent(member->level,highest,false));
+        else snprintf(text,sizeof(text),"Bond %u",member->intimacy);
         render_text(text_x, y + 20 - band_y, text, GAME_UI_MUTED);
-        if (index == 0) render_text(196, y + 20 - band_y, "出战", GAME_UI_ACCENT);
+        if (index == 0) render_text(196, y + 20 - band_y, "Lead", GAME_UI_ACCENT);
         game_ui_list_marker(band_y, 8, y + 10, index, s_party.count, s_selected);
     }
-    if(!s_feedback[0]) { render_text(12, 260 - band_y, "C查看详情", GAME_UI_MUTED);
-    snprintf(text, sizeof(text), "仓库%u只", s_party.box_count);
+    if(!s_feedback[0]) { render_text(12, 260 - band_y, "C: details", GAME_UI_MUTED);
+    snprintf(text, sizeof(text), "Box: %u", s_party.box_count);
     render_text(228 - render_text_width(text), 260 - band_y, text, GAME_UI_MUTED);
     } else game_ui_text_centered(band_y,8,260,224,16,s_feedback,GAME_UI_ACCENT);
     game_ui_footer(band_y, game_ui_list_hint(s_party.count));
@@ -156,24 +156,24 @@ static void draw_detail(int band_y)
     game_ui_title(band_y, name, level);
     snprintf(text, sizeof(text), "#%03u", member->species_id);
     render_text(12, 40 - band_y, text, GAME_UI_MUTED);
-    if (s_box_mode) snprintf(text, sizeof(text), "仓库伙伴");
-    else if (s_selected) snprintf(text, sizeof(text), "队员 %u", s_selected + 1);
-    else snprintf(text, sizeof(text), "出战伙伴");
+    if (s_box_mode) snprintf(text, sizeof(text), "Box Pokemon");
+    else if (s_selected) snprintf(text, sizeof(text), "Member %u", s_selected + 1);
+    else snprintf(text, sizeof(text), "Lead Pokemon");
     render_text(228 - render_text_width(text), 40 - band_y, text, GAME_UI_INK);
     draw_front(band_y, member, 64, 64, 112, 112, false);
-    snprintf(text, sizeof(text), "亲密 %u", member->intimacy);
+    snprintf(text, sizeof(text), "Bond %u", member->intimacy);
     render_text(12, 184 - band_y, text, GAME_UI_INK);
-    snprintf(text, sizeof(text), "探索 %u", member->explore_value);
+    snprintf(text, sizeof(text), "Explore %u", member->explore_value);
     render_text(228 - render_text_width(text), 184 - band_y, text, GAME_UI_INK);
-    snprintf(text, sizeof(text), "经验 %lu", (unsigned long)member->exp);
+    snprintf(text, sizeof(text), "EXP %lu", (unsigned long)member->exp);
     render_text(12, 208 - band_y, text, GAME_UI_MUTED);
-    if (member->flags & 1) render_text(196, 208 - band_y, "闪光", GAME_UI_ACCENT);
+    if (member->flags & 1) render_text(196, 208 - band_y, "Shiny", GAME_UI_ACCENT);
     game_ui_box(band_y, 8, 232, 224, 40);
     const char *hint = s_feedback[0] ? s_feedback : s_box_mode ? GAME_UI_BACK_HINT : GAME_UI_NAV_HINT;
     game_ui_text_centered(band_y, 16, 244, 208, 16, hint,
                          s_success ? GAME_UI_ACCENT : GAME_UI_INK);
-    static const char *const party_actions[] = {"出战", "道具", "技能", "仓库", "进化"};
-    static const char *const box_actions[] = {"换入", "技能", "放生", "进化"};
+    static const char *const party_actions[] = {"Lead", "Items", "Moves", "Box", "Evolve"};
+    static const char *const box_actions[] = {"Swap in", "Moves", "Release", "Evolve"};
     game_ui_actions(band_y, s_box_mode ? box_actions : party_actions,
                     s_box_mode ? 4 : 5, s_action);
 
@@ -187,13 +187,13 @@ static void load_box(void){
  if (!s_box_count) s_box_details = s_skills = false;
 }
 static void draw_box(int band){
- char text[72],name[48];snprintf(text,sizeof(text),"%u/%u",s_party.box_count,BOX_CAPACITY);game_ui_title(band,"仓库",text);
- snprintf(text,sizeof(text),"%s / %s / %s",s_box_filters[s_box_options.filter],s_box_types[s_box_options.type],s_box_options.sort==BOX_SORT_LEVEL?"等级降序":s_box_options.sort==BOX_SORT_LEVEL_ASC?"等级升序":"编号");
+ char text[72],name[48];snprintf(text,sizeof(text),"%u/%u",s_party.box_count,BOX_CAPACITY);game_ui_title(band,"Box",text);
+ snprintf(text,sizeof(text),"%s / %s / %s",s_box_filters[s_box_options.filter],s_box_types[s_box_options.type],s_box_options.sort==BOX_SORT_LEVEL?"Level desc":s_box_options.sort==BOX_SORT_LEVEL_ASC?"Level asc":"Number");
  game_ui_text_centered(band,8,36,224,16,text,GAME_UI_MUTED);
  game_ui_box(band,8,56,224,168);
  if(!s_box_count){
-  game_ui_text_centered(band,16,112,208,16,s_party.box_count?"没有符合条件的伙伴":"仓库暂无伙伴",GAME_UI_MUTED);
-  game_ui_text_centered(band,16,144,208,16,"长按A调整筛选",GAME_UI_MUTED);
+  game_ui_text_centered(band,16,112,208,16,s_party.box_count?"No matching Pokemon":"Box is empty",GAME_UI_MUTED);
+  game_ui_text_centered(band,16,144,208,16,"Hold A: filters",GAME_UI_MUTED);
  }
  for(unsigned i=0,top=s_box_row/5*5;i<5&&top+i<s_box_count;i++){
   mon_t row; if(!world_box_at(s_box_ids[top+i],&row))continue; const mon_t *m=&row;int y=68+i*32;member_name(m,name,sizeof(name));render_text(54,y-band,name,GAME_UI_INK);
@@ -201,9 +201,9 @@ static void draw_box(int band){
   snprintf(text,sizeof(text),"Lv%u",m->level);render_text(216-render_text_width(text),y-band,text,GAME_UI_INK);
   game_ui_list_marker(band,20,y,top+i,s_box_count,s_box_row);
  }
- member_name(&s_party.members[s_selected],name,sizeof(name));snprintf(text,sizeof(text),"换出 %s",name);game_ui_text_centered(band,8,236,224,16,text,GAME_UI_INK);
- game_ui_text_centered(band,8,260,224,16,s_feedback[0]?s_feedback:s_box_paging?"快速翻页 C恢复逐只选择":"长按A筛选排序与翻页",s_box_paging?GAME_UI_ACCENT:GAME_UI_MUTED);
- game_ui_footer(band,s_box_paging?"A上页 B下页 C选择":game_ui_list_hint(s_box_count));
+ member_name(&s_party.members[s_selected],name,sizeof(name));snprintf(text,sizeof(text),"Swap out %s",name);game_ui_text_centered(band,8,236,224,16,text,GAME_UI_INK);
+ game_ui_text_centered(band,8,260,224,16,s_feedback[0]?s_feedback:s_box_paging?"Fast paging. C: one by one":"Hold A: filter and sort",s_box_paging?GAME_UI_ACCENT:GAME_UI_MUTED);
+ game_ui_footer(band,s_box_paging?"A Prev B Next C Pick":game_ui_list_hint(s_box_count));
 }
 
 static unsigned box_menu_count(void)
@@ -215,21 +215,21 @@ static unsigned box_menu_count(void)
 static void draw_box_menu(int band)
 {
     char text[80];
-    snprintf(text, sizeof(text), "%u只匹配", s_box_count);
-    const char *title = s_box_menu == BOX_MENU_OPTIONS ? "仓库选项" :
-        s_box_menu == BOX_MENU_FILTER ? "筛选伙伴" : s_box_menu == BOX_MENU_TYPE ? "按属性筛选" : "排序方式";
+    snprintf(text, sizeof(text), "%u match", s_box_count);
+    const char *title = s_box_menu == BOX_MENU_OPTIONS ? "Box options" :
+        s_box_menu == BOX_MENU_FILTER ? "Filter Pokemon" : s_box_menu == BOX_MENU_TYPE ? "Filter by type" : "Sort by";
     game_ui_title(band, title, text);
     unsigned top = s_box_menu == BOX_MENU_OPTIONS ? 0 : s_box_menu_row / 5 * 5;
     for (unsigned i = top; i < box_menu_count() && i < top + (s_box_menu == BOX_MENU_OPTIONS ? 6 : 5); i++) {
         const char *label;
         if (s_box_menu == BOX_MENU_OPTIONS) {
             switch (i) {
-            case 0: snprintf(text, sizeof(text), "范围 %s", s_box_filters[s_box_options.filter]); break;
-            case 1: snprintf(text, sizeof(text), "属性 %s", s_box_types[s_box_options.type]); break;
-            case 2: snprintf(text, sizeof(text), "排序 %s", s_box_options.sort == BOX_SORT_LEVEL ? "等级从高到低" : "图鉴编号"); break;
-            case 3: snprintf(text, sizeof(text), "快速翻页"); break;
-            case 4: snprintf(text, sizeof(text), "清除筛选"); break;
-            default: snprintf(text, sizeof(text), "返回仓库"); break;
+            case 0: snprintf(text, sizeof(text), "Scope %s", s_box_filters[s_box_options.filter]); break;
+            case 1: snprintf(text, sizeof(text), "Type %s", s_box_types[s_box_options.type]); break;
+            case 2: snprintf(text, sizeof(text), "Sort %s", s_box_options.sort == BOX_SORT_LEVEL ? "Level high-low" : "Dex number"); break;
+            case 3: snprintf(text, sizeof(text), "Fast paging"); break;
+            case 4: snprintf(text, sizeof(text), "Clear filters"); break;
+            default: snprintf(text, sizeof(text), "Back to box"); break;
             }
             label = text;
         } else label = s_box_menu == BOX_MENU_FILTER ? s_box_filters[i] :
@@ -238,8 +238,8 @@ static void draw_box_menu(int band)
         game_ui_text_fitted(band, 36, y, 192, label, GAME_UI_INK);
         game_ui_list_marker(band, 16, y, i, box_menu_count(), s_box_menu_row);
     }
-    const char *hint = s_box_menu == BOX_MENU_FILTER ? "进化需等级达标或已有道具" :
-                       s_box_menu == BOX_MENU_TYPE ? "双属性任一匹配即可" : "只调整显示 不改变伙伴";
+    const char *hint = s_box_menu == BOX_MENU_FILTER ? "Needs level or item" :
+                       s_box_menu == BOX_MENU_TYPE ? "Either type may match" : "Display only. No changes";
     game_ui_text_fitted(band, 8, 252, 224, hint, GAME_UI_MUTED);
     game_ui_footer(band, GAME_UI_NAV_HINT);
 }
@@ -255,18 +255,18 @@ static bool evolution_ready(const evo_option_t *o) {
 static void draw_evolutions(int band) {
  evo_option_t options[EVO_OPTION_MAX];unsigned n=evolution_options(options);
  const mon_t *m=view_member();if(!m)return;
- char text[96];game_ui_title(band,s_evo_confirm?"确认进化":"进化分支",NULL);
- if(!n){game_ui_text_centered(band,8,120,224,16,"当前伙伴没有进化分支",GAME_UI_MUTED);game_ui_footer(band,GAME_UI_BACK_HINT);return;}
+ char text[96];game_ui_title(band,s_evo_confirm?"Confirm evolve":"Evolution",NULL);
+ if(!n){game_ui_text_centered(band,8,120,224,16,"No evolution available",GAME_UI_MUTED);game_ui_footer(band,GAME_UI_BACK_HINT);return;}
  if(s_evo_choice>=n)s_evo_choice=0;
  const evo_option_t *o=s_evo_confirm?&s_evo_option:&options[s_evo_choice];
  if(s_evo_confirm){
-  species_t sp;assets_species(o->target,&sp);snprintf(text,sizeof(text),"进化成%.*s？",sp.name_zh_len,sp.name_zh);
+  species_t sp;assets_species(o->target,&sp);snprintf(text,sizeof(text),"Evolve into %.*s?",sp.name_zh_len,sp.name_zh);
   game_ui_text_fitted(band,16,64,208,text,GAME_UI_INK);
-  game_ui_text_centered(band,16,108,208,16,"等级 经验 闪光保留",GAME_UI_MUTED);
-  game_ui_text_centered(band,16,140,208,16,"技能设置跟随这只伙伴",GAME_UI_MUTED);
-  snprintf(text,sizeof(text),"%s",o->item==ITEM_NONE?"不消耗道具":items_info(o->item)->name);
+  game_ui_text_centered(band,16,108,208,16,"Level, EXP, shiny kept",GAME_UI_MUTED);
+  game_ui_text_centered(band,16,140,208,16,"Move settings carry over",GAME_UI_MUTED);
+  snprintf(text,sizeof(text),"%s",o->item==ITEM_NONE?"No item used":items_info(o->item)->name);
   game_ui_text_centered(band,16,188,208,16,text,GAME_UI_ACCENT);
-  static const char *const labels[]={"取消","确认进化"};game_ui_actions(band,labels,2,s_evo_confirm_choice);return;
+  static const char *const labels[]={"Cancel","Confirm evolve"};game_ui_actions(band,labels,2,s_evo_confirm_choice);return;
  }
  for(unsigned i=0;i<n;i++){
   species_t sp;assets_species(options[i].target,&sp);snprintf(text,sizeof(text),"%.*s",sp.name_zh_len,sp.name_zh);
@@ -275,13 +275,13 @@ static void draw_evolutions(int band) {
  }
  inventory_t bag;world_inventory_snapshot(&bag);johto_state_t j;world_johto_snapshot(&j);
  if(o->item!=ITEM_NONE)snprintf(text,sizeof(text),"%s %u/1",items_info(o->item)->name,bag.quantity[o->item]);
- else if(o->intimacy)snprintf(text,sizeof(text),"亲密 %u/%u",m->intimacy,o->intimacy);
- else snprintf(text,sizeof(text),"等级 %u/%u",m->level,o->level);
+ else if(o->intimacy)snprintf(text,sizeof(text),"Bond %u/%u",m->intimacy,o->intimacy);
+ else snprintf(text,sizeof(text),"Level %u/%u",m->level,o->level);
  game_ui_text_centered(band,8,190,224,16,text,GAME_UI_INK);
- if(o->badges)snprintf(text,sizeof(text),"城都徽章 %u/%u",johto_badges(&j),o->badges);
- else snprintf(text,sizeof(text),"%s",o->item==ITEM_NONE?"不消耗道具":"消耗1个对应道具");
+ if(o->badges)snprintf(text,sizeof(text),"Johto badges %u/%u",johto_badges(&j),o->badges);
+ else snprintf(text,sizeof(text),"%s",o->item==ITEM_NONE?"No item used":"Uses 1 matching item");
  game_ui_text_centered(band,8,216,224,16,text,GAME_UI_MUTED);
- game_ui_text_centered(band,8,246,224,16,s_feedback[0]?s_feedback:o->training?o->training:evolution_ready(o)?"条件满足 C选择":"继续培养或收集道具",GAME_UI_ACCENT);
+ game_ui_text_centered(band,8,246,224,16,s_feedback[0]?s_feedback:o->training?o->training:evolution_ready(o)?"Ready. C to pick":"Keep raising or find items",GAME_UI_ACCENT);
  game_ui_footer(band,GAME_UI_NAV_HINT);
 }
 static void draw_range(int top, int bottom)
@@ -293,26 +293,26 @@ static void draw_range(int top, int bottom)
             char name[48], level[24];
             member_name(&s_release_expected, name, sizeof(name));
             snprintf(level, sizeof(level), "Lv%u", s_release_expected.level);
-            game_ui_title(y, "放生伙伴？", level);
+            game_ui_title(y, "Release Pokemon?", level);
             draw_front(y, &s_release_expected, 64, 44, 112, 112, false);
             game_ui_text_centered(y, 8, 168, 224, 16, name, GAME_UI_INK);
             game_ui_box(y, 8, 196, 224, 44);
             game_ui_text_centered(y, 16, 210, 208, 16,
-                s_release_expected.flags & 1 ? "闪光伙伴 放生无法撤销" : "放生后无法撤销", GAME_UI_ACCENT);
+                s_release_expected.flags & 1 ? "Shiny! Can't be undone" : "Can't be undone", GAME_UI_ACCENT);
             game_ui_text_centered(y, 8, 252, 224, 16,
                 s_feedback[0] ? s_feedback : GAME_UI_BACK_HINT, GAME_UI_INK);
-            static const char *const actions[] = {"取消", "确认放生"};
+            static const char *const actions[] = {"Cancel", "Release"};
             game_ui_actions(y, actions, 2, s_release_choice);
         }
         else if (s_end_dungeon) {
-            game_ui_title(y, "结束秘境？", "换入伙伴");
+            game_ui_title(y, "End dungeon run?", "Swap in Pokemon");
             game_ui_box(y, 8, 56, 224, 176);
-            game_ui_text_centered(y, 16, 76, 208, 16, "换入需要结束本局", GAME_UI_INK);
-            game_ui_text_centered(y, 16, 108, 208, 16, "已得经验和道具保留", GAME_UI_ACCENT);
-            game_ui_text_centered(y, 16, 140, 208, 16, "本局无法继续", GAME_UI_MUTED);
-            game_ui_text_centered(y, 16, 172, 208, 16, "入场体能不退还", GAME_UI_MUTED);
+            game_ui_text_centered(y, 16, 76, 208, 16, "Swapping ends this run", GAME_UI_INK);
+            game_ui_text_centered(y, 16, 108, 208, 16, "EXP and items are kept", GAME_UI_ACCENT);
+            game_ui_text_centered(y, 16, 140, 208, 16, "Run can't continue", GAME_UI_MUTED);
+            game_ui_text_centered(y, 16, 172, 208, 16, "Entry stamina not refunded", GAME_UI_MUTED);
             game_ui_text_centered(y, 8, 252, 224, 16, s_feedback, GAME_UI_INK);
-            static const char *const actions[] = {"取消", "结束并换入"};
+            static const char *const actions[] = {"Cancel", "End and swap in"};
             game_ui_actions(y, actions, 2, s_end_choice);
         }
         else if (s_box_mode && s_box_menu) draw_box_menu(y);
@@ -420,13 +420,13 @@ static void select_leader(void)
 {
     world_switch_result_t result = world_set_leader(s_selected, &s_party.members[s_selected], &s_party);
     s_success = result == WORLD_SWITCH_OK || result == WORLD_SWITCH_ALREADY_LEADER;
-    const char *message = "伙伴已变 请重试";
+    const char *message = "Pokemon changed. Retry";
     switch (result) {
-    case WORLD_SWITCH_OK: s_selected = 0; message = "已设为出战伙伴"; break;
-    case WORLD_SWITCH_ALREADY_LEADER: s_selected = 0; message = "已经是出战伙伴"; break;
-    case WORLD_SWITCH_BUSY: message = dungeon_party_locked()?"请先结束秘境旅程":"请先结束当前对战"; break;
-    case WORLD_SWITCH_SAVE_FAILED: message = "保存失败 请重试"; break;
-    case WORLD_SWITCH_STORAGE_UNAVAILABLE: message = "存档暂不可用"; break;
+    case WORLD_SWITCH_OK: s_selected = 0; message = "Set as lead Pokemon"; break;
+    case WORLD_SWITCH_ALREADY_LEADER: s_selected = 0; message = "Already the lead"; break;
+    case WORLD_SWITCH_BUSY: message = dungeon_party_locked()?"End the dungeon run first":"Finish current battle first"; break;
+    case WORLD_SWITCH_SAVE_FAILED: message = "Save failed. Retry"; break;
+    case WORLD_SWITCH_STORAGE_UNAVAILABLE: message = "Save unavailable"; break;
     default: break;
     }
     if (!s_success) refresh_snapshot();
@@ -442,7 +442,7 @@ static void exchange_member(void)
         s_feedback[0] = 0;
         return;
     }
-    const char *message = result == WORLD_SWITCH_OK ? "队伍已更换" : result == WORLD_SWITCH_BUSY ? "请先结束当前对战" : result == WORLD_SWITCH_SAVE_FAILED ? "保存失败 请重试" : result == WORLD_SWITCH_INVALID ? "仓库选择无效 请重试" : "伙伴已变 请重试";
+    const char *message = result == WORLD_SWITCH_OK ? "Party updated" : result == WORLD_SWITCH_BUSY ? "Finish current battle first" : result == WORLD_SWITCH_SAVE_FAILED ? "Save failed. Retry" : result == WORLD_SWITCH_INVALID ? "Invalid pick. Retry" : "Pokemon changed. Retry";
     snprintf(s_feedback, sizeof(s_feedback), "%s", message);
     refresh_snapshot();
     load_box();
@@ -470,7 +470,7 @@ void play_party_key(bsp_btn_t btn, bsp_btn_ev_t ev)
             s_evo_choice=nav_list_selection(btn,ev,n,s_evo_choice);
             if(confirm&&n){
                 if(evolution_ready(&options[s_evo_choice])){s_evo_expected=*view_member();s_evo_option=options[s_evo_choice];s_evo_confirm=true;s_evo_confirm_choice=0;}
-                else snprintf(s_feedback,sizeof(s_feedback),"进化条件尚未满足");
+                else snprintf(s_feedback,sizeof(s_feedback),"Evolution not unlocked");
             }else s_feedback[0]=0;
         }
         draw_all();return;
@@ -483,10 +483,10 @@ void play_party_key(bsp_btn_t btn, bsp_btn_ev_t ev)
         } else if (confirm) {
             world_switch_result_t result = world_box_release(s_release_slot, &s_release_expected);
             s_success = result == WORLD_SWITCH_OK;
-            const char *message = s_success ? "伙伴已放生" :
-                result == WORLD_SWITCH_SAVE_FAILED ? "保存失败 请重试" :
-                result == WORLD_SWITCH_BUSY ? "请先结束对战或秘境" :
-                result == WORLD_SWITCH_STORAGE_UNAVAILABLE ? "存档暂不可用" : "伙伴已变 请重试";
+            const char *message = s_success ? "Pokemon released" :
+                result == WORLD_SWITCH_SAVE_FAILED ? "Save failed. Retry" :
+                result == WORLD_SWITCH_BUSY ? "End battle or dungeon first" :
+                result == WORLD_SWITCH_STORAGE_UNAVAILABLE ? "Save unavailable" : "Pokemon changed. Retry";
             snprintf(s_feedback, sizeof(s_feedback), "%s", message);
             if (s_success || result == WORLD_SWITCH_STALE || result == WORLD_SWITCH_INVALID) {
                 s_release_confirm = s_box_details = false; s_action = 0;
@@ -542,7 +542,7 @@ void play_party_key(bsp_btn_t btn, bsp_btn_ev_t ev)
             s_feedback[0] = 0;
         } else if (confirm) {
             if (!dungeon_abandon()) {
-                snprintf(s_feedback, sizeof(s_feedback), "保存失败 请重试");
+                snprintf(s_feedback, sizeof(s_feedback), "Save failed. Retry");
             } else {
                 s_end_dungeon = false;
                 // Pending dungeon rewards may change the outgoing member's EXP.
@@ -563,9 +563,9 @@ void play_party_key(bsp_btn_t btn, bsp_btn_ev_t ev)
             else if(confirm){
                 unsigned id=s_skill<(unsigned)count?ids[s_skill]:0;
                 world_switch_result_t r=world_move_set(policy_slot(),view_member(),id,!move_policy_allows(&s_policy,id));
-                const char *message=r==WORLD_SWITCH_OK?(id?(move_policy_allows(&s_policy,id)?"已禁用 自动战斗不选用":"已启用"):"已全部启用"):
-                    r==WORLD_SWITCH_LAST_MOVE?"至少保留一招":r==WORLD_SWITCH_BUSY?"对战或秘境中无法修改":
-                    r==WORLD_SWITCH_SAVE_FAILED?"保存失败 请重试":r==WORLD_SWITCH_STORAGE_UNAVAILABLE?"存档暂不可用":"伙伴已变 请重试";
+                const char *message=r==WORLD_SWITCH_OK?(id?(move_policy_allows(&s_policy,id)?"Off: not used in auto":"Enabled"):"All enabled"):
+                    r==WORLD_SWITCH_LAST_MOVE?"Keep at least one move":r==WORLD_SWITCH_BUSY?"Can't change in battle/run":
+                    r==WORLD_SWITCH_SAVE_FAILED?"Save failed. Retry":r==WORLD_SWITCH_STORAGE_UNAVAILABLE?"Save unavailable":"Pokemon changed. Retry";
                 snprintf(s_feedback,sizeof(s_feedback),"%s",message);refresh_policy();
             }
         }
@@ -601,7 +601,7 @@ void play_party_key(bsp_btn_t btn, bsp_btn_ev_t ev)
         else exchange_member();
     } else if (s_action == 0) select_leader();
     else if (s_action == 1) {
-        if (s_selected) { s_success = false; snprintf(s_feedback, sizeof(s_feedback), "请先设为出战伙伴"); }
+        if (s_selected) { s_success = false; snprintf(s_feedback, sizeof(s_feedback), "Set as lead first"); }
         else { nav_open(PAGE_BAG); return; }
     } else if (s_action == 2) { s_skills = true; s_skill = 0; s_feedback[0]=0; refresh_policy(); }
     else { s_box_mode = true; s_box_details = false; s_box_menu = BOX_MENU_CLOSED; s_box_paging = false; s_box_row = s_action = 0; s_feedback[0] = 0; load_box(); reset_motion(); }

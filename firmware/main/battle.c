@@ -44,9 +44,9 @@ uint16_t battle_effectiveness(uint8_t atk, uint8_t def1, uint8_t def2)
 
 const char *battle_eff_label(uint16_t mult)
 {
-    if (mult == 0) return "没有效果…";
-    if (mult >= 200) return "效果绝佳！";
-    if (mult <= 50) return "效果不好…";
+    if (mult == 0) return "No effect...";
+    if (mult >= 200) return "Super effective!";
+    if (mult <= 50) return "Not very effective...";
     return NULL;              // 正常倍率**不提示**，见 battle.h
 }
 

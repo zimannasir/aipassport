@@ -58,8 +58,8 @@ unsigned evo_options(uint16_t species,uint8_t trigger,uint16_t target,uint8_t le
 #define FRIEND(from,to) {from,{to,ITEM_NONE,0,80,0,0}}
         FRIEND(42,169),FRIEND(113,242),FRIEND(172,25),FRIEND(173,35),FRIEND(174,39),FRIEND(175,176),
 #undef FRIEND
-        {133,{196,ITEM_NONE,0,80,3,"晨光训练"}},{133,{197,ITEM_NONE,0,80,3,"夜行训练"}},
-        {236,{106,ITEM_NONE,20,0,5,"攻击训练"}},{236,{107,ITEM_NONE,20,0,5,"防守训练"}},{236,{237,ITEM_NONE,20,0,5,"均衡训练"}},
+        {133,{196,ITEM_NONE,0,80,3,"Dawn Training"}},{133,{197,ITEM_NONE,0,80,3,"Night Training"}},
+        {236,{106,ITEM_NONE,20,0,5,"Attack Training"}},{236,{107,ITEM_NONE,20,0,5,"Defense Training"}},{236,{237,ITEM_NONE,20,0,5,"Balanced Training"}},
     };
     unsigned count=0;
     // Tyrogue's three choices replace its data-file default, never bypass training.

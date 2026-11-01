@@ -178,8 +178,8 @@ void game_ui_text_fitted(int band_y, int x, int y, int width, const char *text, 
 
 void game_ui_moves(int y,uint16_t species,uint8_t level,unsigned selected,bool in_battle){
  uint16_t ids[COMBAT_MOVE_CAP];int count=combat_known_moves(species,level,ids,COMBAT_MOVE_CAP);char text[80];
- snprintf(text,sizeof(text),"已学会 %d",count);game_ui_title(y,"技能",text);
- if(!count){game_ui_text_centered(y,16,112,208,16,"暂时没有已学招式",GAME_UI_MUTED);game_ui_footer(y,GAME_UI_BACK_HINT);return;}
+ snprintf(text,sizeof(text),"Learned %d",count);game_ui_title(y,"Moves",text);
+ if(!count){game_ui_text_centered(y,16,112,208,16,"No moves learned yet",GAME_UI_MUTED);game_ui_footer(y,GAME_UI_BACK_HINT);return;}
  selected%=count;unsigned top=selected/5*5;
  for(unsigned row=0;row<5&&top+row<(unsigned)count;row++){
   unsigned index=top+row;move_t m;combat_move(ids[index],&m);int sy=44+row*34;
@@ -189,8 +189,8 @@ void game_ui_moves(int y,uint16_t species,uint8_t level,unsigned selected,bool i
  }
  game_ui_box(y,8,216,224,56);
  game_ui_text_fitted(y,16,228,208,combat_description(ids[selected]),GAME_UI_INK);
- game_ui_text_centered(y,16,250,208,16,"升级自动学会 永不遗忘",GAME_UI_MUTED);
- game_ui_footer(y,in_battle?"A上 B下 C继续 长按B返回":GAME_UI_NAV_HINT);
+ game_ui_text_centered(y,16,250,208,16,"Learned on level-up",GAME_UI_MUTED);
+ game_ui_footer(y,in_battle?"A Up B Dn C Go Hold B Back":GAME_UI_NAV_HINT);
 }
 
 void game_ui_fade_background(int band_y,unsigned amount) {
@@ -202,22 +202,22 @@ void game_ui_fade_background(int band_y,unsigned amount) {
 
 void game_ui_move_settings(int y,uint16_t species,uint8_t level,unsigned selected,const move_policy_t *policy,const char *feedback){
  uint16_t ids[COMBAT_MOVE_CAP];int n=combat_known_moves(species,level,ids,COMBAT_MOVE_CAP);char text[80];
- snprintf(text,sizeof(text),"启用 %d/%d",combat_enabled_moves(species,level,policy),n);game_ui_title(y,"招式设置",text);
+ snprintf(text,sizeof(text),"On %d/%d",combat_enabled_moves(species,level,policy),n);game_ui_title(y,"Move settings",text);
  selected%=(unsigned)n+1;unsigned top=selected/5*5;
  for(unsigned row=0;row<5&&top+row<=(unsigned)n;row++){
   unsigned i=top+row;int sy=44+row*34;
   game_ui_list_marker(y,8,sy,i,n+1,selected);
-  if(i==(unsigned)n){render_text(44,sy-y,"全部启用",GAME_UI_ACCENT);continue;}
+  if(i==(unsigned)n){render_text(44,sy-y,"Enable all",GAME_UI_ACCENT);continue;}
   bool enabled=move_policy_allows(policy,ids[i]);
   // Pixel checkbox shares the monochrome Gold/Silver frame language.
   rect(&y,26,sy+2,12,12,GAME_UI_INK);rect(&y,28,sy+4,8,8,GAME_UI_BG);
   if(enabled){rect(&y,29,sy+7,3,3,GAME_UI_INK);rect(&y,32,sy+5,3,5,GAME_UI_INK);}
   move_t m;combat_move(ids[i],&m);snprintf(text,sizeof(text),"%.*s",m.name_zh_len,m.name_zh);
   game_ui_text_fitted(y,44,sy,140,text,enabled?GAME_UI_INK:GAME_UI_MUTED);
-  render_text(192,sy-y,enabled?"启用":"禁用",enabled?GAME_UI_ACCENT:GAME_UI_MUTED);
+  render_text(192,sy-y,enabled?"On":"Off",enabled?GAME_UI_ACCENT:GAME_UI_MUTED);
  }
  game_ui_box(y,8,216,224,56);
- game_ui_text_fitted(y,16,226,208,selected<(unsigned)n?combat_description(ids[selected]):"恢复所有已学招式",GAME_UI_INK);
- game_ui_text_fitted(y,16,250,208,feedback&&*feedback?feedback:"新学招式默认启用",GAME_UI_MUTED);
- game_ui_footer(y,"A上 B下 C切换 长按B返回");
+ game_ui_text_fitted(y,16,226,208,selected<(unsigned)n?combat_description(ids[selected]):"Re-enable learned moves",GAME_UI_INK);
+ game_ui_text_fitted(y,16,250,208,feedback&&*feedback?feedback:"New moves start enabled",GAME_UI_MUTED);
+ game_ui_footer(y,"A Up B Dn C Set Hold B Back");
 }

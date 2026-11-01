@@ -63,7 +63,7 @@ SCREEN_ASSERT_ALLOW_CROSS_BAND(care_axis_2, AXIS_Y0 + AXIS_STEP * 2, TEXT_H);
 SCREEN_ASSERT_ALLOW_CROSS_BAND(care_evolution_hint, EVO_HINT_Y, TEXT_H);
 SCREEN_ASSERT_ALLOW_CROSS_BAND(care_name_hint, NAME_HINT_Y, TEXT_H);
 
-static const char *ACTIONS[ACTION_COUNT] = {"喂食", "玩耍(-5)", "养成效果", "背包", "进化"};
+static const char *ACTIONS[ACTION_COUNT] = {"Feed", "Play(-5)", "Effects", "Bag", "Evolve"};
 static uint8_t s_sel;
 static bool s_benefits;
 static world_t s_w;
@@ -103,13 +103,13 @@ static void draw_band(int band_y)
     bool has_species = assets_species(display_species, &sp);
 
     battery_ui_playtime_text(buf, sizeof(buf));
-    game_ui_title(band_y, "照料", buf);
+    game_ui_title(band_y, "Care", buf);
     if (has_species) {
         snprintf(buf, sizeof(buf), "%.*s", sp.name_zh_len, sp.name_zh);
         game_ui_text_fitted(band_y, 12, 40, 144, buf, GAME_UI_INK);
     }
     battery_ui_draw(band_y, 228, 40);
-    snprintf(buf, sizeof(buf), "Lv%u 亲密度 %u", s_w.level, nurture_pct(s_w.pet.intimacy));
+    snprintf(buf, sizeof(buf), "Lv%u Bond %u", s_w.level, nurture_pct(s_w.pet.intimacy));
     render_text(12, Y(60), buf, GAME_UI_MUTED);
 
     uint8_t count = action_count();
@@ -120,7 +120,7 @@ static void draw_band(int band_y)
         }
         const char *label = ACTIONS[i];
         if (i == 0) {
-            snprintf(buf, sizeof(buf), "喂食 x%u", s_inventory.quantity[ITEM_BERRY]);
+            snprintf(buf, sizeof(buf), "Feed x%u", s_inventory.quantity[ITEM_BERRY]);
             label = buf;
         }
         render_text(28, Y(y), label, i == s_sel && !(i == 1 && s_w.pet.stamina < NURT_PLAY_STAMINA) ? GAME_UI_INK : GAME_UI_MUTED);
@@ -141,7 +141,7 @@ static void draw_band(int band_y)
                                  spr, sprite_size, sprite_size, CARE_SPRITE_SCALE, pal);
     }
 
-    static const char *AXIS[3] = {"饱食", "心情", "体能"};
+    static const char *AXIS[3] = {"Full", "Mood", "Stamina"};
     const uint8_t value[3] = {
         nurture_pct(s_w.pet.satiety),
         nurture_pct(s_w.pet.mood),
@@ -150,25 +150,25 @@ static void draw_band(int band_y)
     for (int i = 0; i < 3; i++) {
         int y = AXIS_Y0 + i * AXIS_STEP;
         render_text(12, Y(y), AXIS[i], GAME_UI_INK);
-        game_ui_meter(band_y, 56, y, 128, value[i]);
+        game_ui_meter(band_y, 76, y, 108, value[i]);
         snprintf(buf, sizeof(buf), "%u", value[i]);
         render_text(228 - render_text_width(buf), Y(y), buf, GAME_UI_INK);
     }
 
-    snprintf(buf,sizeof(buf),"经验%u%% 稀有+%u.%u%%",nurture_exp_percent(&s_w.pet),nurture_rare_bonus(&s_w.pet)/10,nurture_rare_bonus(&s_w.pet)%10);
+    snprintf(buf,sizeof(buf),"EXP %u%% Rare +%u.%u%%",nurture_exp_percent(&s_w.pet),nurture_rare_bonus(&s_w.pet)/10,nurture_rare_bonus(&s_w.pet)%10);
     const char *evo_hint = NULL;
     if (s_care_feedback[0]) evo_hint = s_care_feedback;
-    else if (s_evo.can) evo_hint = "可以进化了";
+    else if (s_evo.can) evo_hint = "Ready to evolve";
     else {
         species_t evolution;
         if (assets_species(s_w.species, &evolution) && evolution.evolve_trigger == EVO_TRIGGER_LEVEL &&
             evolution.evolve_to && evolution.evolve_to <= BOX_SPECIES && evolution.evolve_level) {
-            snprintf(buf, sizeof(buf), "Lv%u可进化 当前Lv%u", evolution.evolve_level, s_w.level);
+            snprintf(buf, sizeof(buf), "Evolves Lv%u (now Lv%u)", evolution.evolve_level, s_w.level);
         }
     }
     game_ui_text_centered(band_y,8,EVO_HINT_Y,224,16,evo_hint?evo_hint:buf,GAME_UI_INK);
     game_ui_text_centered(band_y, 12, NAME_HINT_Y, 216, TEXT_H,
-                          "养成效果可查看当前加成", GAME_UI_MUTED);
+                          "See current bonuses", GAME_UI_MUTED);
 
     game_ui_footer(band_y, GAME_UI_NAV_HINT);
 
@@ -180,20 +180,20 @@ static void draw_benefits(void)
 {
  char line[80];
  for(int band=0;band<SCR_H;band+=BAND_H){
-  screen_band_clear(GAME_UI_BG);game_ui_title(band,"养成效果",NULL);
-  snprintf(line,sizeof(line),"获得经验 %u%%",nurture_exp_percent(&s_w.pet));
+  screen_band_clear(GAME_UI_BG);game_ui_title(band,"Effects",NULL);
+  snprintf(line,sizeof(line),"EXP gain %u%%",nurture_exp_percent(&s_w.pet));
   game_ui_text_centered(band,8,44,224,16,line,GAME_UI_INK);
-  game_ui_text_centered(band,8,66,224,16,"饱食+25% 心情+10%",GAME_UI_MUTED);
-  game_ui_text_centered(band,8,84,224,16,"亲密最多+20%",GAME_UI_MUTED);
-  snprintf(line,sizeof(line),"特殊事件机会 %u%%",nurture_event_percent(&s_w.pet));
+  game_ui_text_centered(band,8,66,224,16,"Full +25% Mood +10%",GAME_UI_MUTED);
+  game_ui_text_centered(band,8,84,224,16,"Bond up to +20%",GAME_UI_MUTED);
+  snprintf(line,sizeof(line),"Special event chance %u%%",nurture_event_percent(&s_w.pet));
   game_ui_text_centered(band,8,102,224,16,line,GAME_UI_INK);
-  game_ui_text_centered(band,8,126,224,16,"心情越好 事件越多",GAME_UI_MUTED);
-  snprintf(line,sizeof(line),"亲密捕获窗口 +%u%%",nurture_capture_percent(&s_w.pet)-100);
+  game_ui_text_centered(band,8,126,224,16,"Better mood, more events",GAME_UI_MUTED);
+  snprintf(line,sizeof(line),"Bond catch window +%u%%",nurture_capture_percent(&s_w.pet)-100);
   game_ui_text_centered(band,8,160,224,16,line,GAME_UI_INK);
-  game_ui_text_centered(band,8,184,224,16,"与心情和球种加成叠加",GAME_UI_MUTED);
-  game_ui_text_centered(band,8,220,224,16,"体能每36秒恢复1点",GAME_UI_INK);
-  game_ui_text_centered(band,8,244,224,16,"空到满约1小时",GAME_UI_MUTED);
-  game_ui_footer(band,"C关闭 长按B返回");screen_push_band(band);
+  game_ui_text_centered(band,8,184,224,16,"Stacks with mood and ball",GAME_UI_MUTED);
+  game_ui_text_centered(band,8,220,224,16,"Stamina +1 every 36 s",GAME_UI_INK);
+  game_ui_text_centered(band,8,244,224,16,"Empty to full: ~1 hour",GAME_UI_MUTED);
+  game_ui_footer(band,"C: close  Hold B: back");screen_push_band(band);
  }
 }
 static void draw_all(void)
@@ -223,7 +223,7 @@ static void start_evolution(void)
  species_t sp;
  if(s_evo.can && assets_species(s_w.species,&sp)) {
   if(!evolution_ui_begin(s_w.species,sp.evolve_to,ITEM_NONE)) {
-   snprintf(s_care_feedback,sizeof(s_care_feedback),"无法开始进化");draw_all();
+   snprintf(s_care_feedback,sizeof(s_care_feedback),"Can't start evolution");draw_all();
   }
  }
 }
@@ -317,19 +317,19 @@ void play_care_key(bsp_btn_t btn, bsp_btn_ev_t ev)
             item_use_result_t result;
             item_use_status_t status = world_item_use(s_w.species, ITEM_BERRY, &result);
             applied = status == ITEM_USE_OK;
-            const char *message = status == ITEM_USE_OK ? "吃得很满足"
-                : status == ITEM_USE_EMPTY ? "树果用完 去战斗"
-                : status == ITEM_USE_NOT_APPLICABLE ? "已经吃饱了"
-                : status == ITEM_USE_SAVE_FAILED ? "保存失败 请重试"
-                : status == ITEM_USE_STORAGE_UNAVAILABLE ? "存档暂不可用"
-                : status == ITEM_USE_BUSY ? "请先结束对战" : "伙伴已变 请重试";
+            const char *message = status == ITEM_USE_OK ? "Delicious!"
+                : status == ITEM_USE_EMPTY ? "Out of berries. Go battle"
+                : status == ITEM_USE_NOT_APPLICABLE ? "Already full"
+                : status == ITEM_USE_SAVE_FAILED ? "Save failed. Retry"
+                : status == ITEM_USE_STORAGE_UNAVAILABLE ? "Save unavailable"
+                : status == ITEM_USE_BUSY ? "Finish the battle first" : "Pokemon changed. Retry";
             snprintf(s_care_feedback, sizeof(s_care_feedback), "%s", message);
         }
         if (s_sel == 1) {
             applied = world_play();
             world_snapshot(&s_w);
-            snprintf(s_care_feedback, sizeof(s_care_feedback), "%s", applied ? "玩得很开心 体能-5"
-                     : s_w.pet.stamina < NURT_PLAY_STAMINA ? "体能不足5点 请先休息" : "暂时无法玩耍 请重试");
+            snprintf(s_care_feedback, sizeof(s_care_feedback), "%s", applied ? "Had fun! Stamina -5"
+                     : s_w.pet.stamina < NURT_PLAY_STAMINA ? "Need 5 stamina. Rest first" : "Can't play now. Retry");
         }
         if (s_sel == 2) { applied=false;s_benefits=true; }
         world_snapshot(&s_w);

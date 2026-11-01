@@ -26,6 +26,7 @@
 #include "assets.h"
 #include "combat.h"
 #include "pokemon_names.h"
+#include "english_names.h"
 
 static const char *TAG = "assets";
 
@@ -130,6 +131,13 @@ bool assets_species(uint16_t id, species_t *out)
     if (selected_name) {
         out->name_zh = selected_name;
         out->name_zh_len = selected_length;
+    }
+    // English-only UI: English names win over both Chinese name styles.
+    uint8_t english_length = 0;
+    const char *english_name = english_species_name(id, &english_length);
+    if (english_name) {
+        out->name_zh = english_name;
+        out->name_zh_len = english_length;
     }
     return true;
 }

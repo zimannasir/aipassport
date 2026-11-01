@@ -114,33 +114,33 @@ static void capture_member_label(const mon_t *mon,char *out,size_t size) {
 }
 static void draw_replacements(int band) {
     char text[80], capacity[16];
-    snprintf(capacity,sizeof(capacity),"%u格",BOX_CAPACITY);
-    game_ui_title(band,s_replace==REPLACE_LIST?"仓库已满":s_replace==REPLACE_DISCARD?"放走新伙伴？":"替换伙伴？",capacity);
+    snprintf(capacity,sizeof(capacity),"%u slots",BOX_CAPACITY);
+    game_ui_title(band,s_replace==REPLACE_LIST?"Box is full":s_replace==REPLACE_DISCARD?"Release new Pokemon?":"Replace a Pokemon?",capacity);
 
     if(s_replace==REPLACE_LIST){
-        game_ui_text_fitted(band,12,64,216,"选择要替换的仓库伙伴",GAME_UI_INK);
+        game_ui_text_fitted(band,12,64,216,"Pick a box Pokemon to replace",GAME_UI_INK);
         for(unsigned i=0,top=s_replace_row/5*5;i<5&&top+i<s_replace_count;i++){
             mon_t m;if(!world_box_at(s_replace_ids[top+i],&m))continue;
             capture_member_label(&m,text,sizeof(text));
             game_ui_text_fitted(band,36,94+i*30,192,text,GAME_UI_INK);
             game_ui_list_marker(band,14,94+i*30,top+i,s_replace_count,s_replace_row);
         }
-        game_ui_text_fitted(band,12,252,216,s_replace_message?s_replace_message:"长按A切换排序",GAME_UI_MUTED);
-        game_ui_footer(band,"A上 B下 C选择 长按B放走");
+        game_ui_text_fitted(band,12,252,216,s_replace_message?s_replace_message:"Hold A: change sort",GAME_UI_MUTED);
+        game_ui_footer(band,"A Up B Dn C Pick HoldB Free");
     }else{
         game_ui_box(band,8,80,224,136);
         if(s_replace==REPLACE_CONFIRM){
-            game_ui_text_fitted(band,20,96,200,"将放生以下伙伴",GAME_UI_INK);
+            game_ui_text_fitted(band,20,96,200,"This Pokemon is released",GAME_UI_INK);
             capture_member_label(&s_replace_expected,text,sizeof(text));
             game_ui_text_fitted(band,20,130,200,text,GAME_UI_INK);
-            game_ui_text_fitted(band,20,174,200,s_replace_expected.flags&1?"这是闪光伙伴，无法撤销":"替换后无法撤销",GAME_UI_ACCENT);
+            game_ui_text_fitted(band,20,174,200,s_replace_expected.flags&1?"It's shiny. Can't be undone":"Replacing can't be undone",GAME_UI_ACCENT);
         }else{
-            game_ui_text_fitted(band,20,108,200,"保留仓库所有伙伴",GAME_UI_INK);
-            game_ui_text_fitted(band,20,156,200,"新捕获的伙伴将离开",GAME_UI_ACCENT);
+            game_ui_text_fitted(band,20,108,200,"Keep all box Pokemon",GAME_UI_INK);
+            game_ui_text_fitted(band,20,156,200,"The new catch will leave",GAME_UI_ACCENT);
         }
         if(s_replace_message)game_ui_text_fitted(band,12,244,216,s_replace_message,GAME_UI_ACCENT);
-        static const char *const replace_actions[]={"取消","确认替换"};
-        static const char *const discard_actions[]={"取消","确认放走"};
+        static const char *const replace_actions[]={"Cancel","Replace"};
+        static const char *const discard_actions[]={"Cancel","Release"};
         game_ui_actions(band,s_replace==REPLACE_CONFIRM?replace_actions:discard_actions,2,s_replace_choice);
     }
     // Draw the common incoming identity last, above either list or modal.
@@ -313,7 +313,7 @@ static void draw_band(int band_y)
     } else {
         snprintf(buf, sizeof(buf), "#%03u", c->enc.species_id);
     }
-    game_ui_title(band_y, "捕获", buf);
+    game_ui_title(band_y, "Catch", buf);
 
     // 正面按实际源尺寸 2x 居中。缺图回退也必须读取 BACK 的真实尺寸，
     // 不能把 GSC 48px 记录按旧的 32px 步长解码。
@@ -339,13 +339,13 @@ static void draw_band(int band_y)
 
     if (s_chain_prompt) {
         game_ui_box(band_y, 8, 160, 224, 112);
-        render_text(20, Y(174), "要中断连胜并捕获吗？", GAME_UI_INK);
-        snprintf(buf, sizeof(buf), "当前连胜 %lu", (unsigned long)world_exploration_chain());
+        render_text(20, Y(174), "Break streak and catch?", GAME_UI_INK);
+        snprintf(buf, sizeof(buf), "Streak %lu", (unsigned long)world_exploration_chain());
         render_text(20, Y(196), buf, GAME_UI_INK);
-        game_ui_text_fitted(band_y, 20, 218, 200, "确认后不论成败都会清零", GAME_UI_MUTED);
-        static const char *const labels[] = {"取消", "捕获"};
+        game_ui_text_fitted(band_y, 20, 218, 200, "Resets win or lose", GAME_UI_MUTED);
+        static const char *const labels[] = {"Cancel", "Catch"};
         game_ui_action_row(band_y, 20, 246, 200, labels, 2, s_chain_choice);
-        game_ui_footer(band_y, s_save_failed ? "保存失败，请重试" : GAME_UI_NAV_HINT);
+        game_ui_footer(band_y, s_save_failed ? "Save failed. Retry" : GAME_UI_NAV_HINT);
         screen_push_band(band_y);
         return;
     }
@@ -362,8 +362,8 @@ static void draw_band(int band_y)
     snprintf(buf, sizeof(buf), "%s ×%u", cap_ball_name(s_ball),
              s_inventory.quantity[s_ball]);
     render_text(44, Y(BALL_Y + 4), buf, GAME_UI_INK);
-    render_text(12, Y(INSTRUCTION_Y), s_box_full ? "满仓：捕获后选择替换" : s_session.won ? "战斗获胜，仅此一球"
-                : "在蓝色区域投球", GAME_UI_MUTED);
+    render_text(12, Y(INSTRUCTION_Y), s_box_full ? "Box full: pick a swap" : s_session.won ? "Won! One ball only"
+                : "Throw in the blue zone", GAME_UI_MUTED);
 
     // 判定条
     if (band_y < BAR_BOX_Y+32 && band_y+BAND_H > BAR_BOX_Y) draw_bar_band(band_y);
@@ -372,31 +372,31 @@ static void draw_band(int band_y)
 
     // 结果
     if (s_animating && s_anim_ms < CAPTURE_REVEAL_MS) {
-        render_text(12, Y(MSG_Y), s_anim_ms < capture_frame_ms(97) ? "投出精灵球！" : "捕获中", GAME_UI_INK);
+        render_text(12, Y(MSG_Y), s_anim_ms < capture_frame_ms(97) ? "Ball thrown!" : "Catching", GAME_UI_INK);
     } else if (s_capture_pending) {
-        render_text(12, Y(MSG_Y), "已命中，保存失败", GAME_UI_INK);
+        render_text(12, Y(MSG_Y), "Hit! Save failed", GAME_UI_INK);
     } else if (s_hold_active && c->done_note == NAV_NOTE_CAUGHT) {
-        render_text(12, Y(MSG_Y), "已捕获", GAME_UI_INK);
-        snprintf(buf,sizeof(buf),"经验 +%u",s_capture_exp);const char *note = buf;
+        render_text(12, Y(MSG_Y), "Caught", GAME_UI_INK);
+        snprintf(buf,sizeof(buf),"EXP +%u",s_capture_exp);const char *note = buf;
         render_text(228 - render_text_width(note), Y(MSG_Y), note, GAME_UI_MUTED);
     } else if (s_caught) {
-        render_text(12, Y(MSG_Y), "捕获成功", GAME_UI_INK);
+        render_text(12, Y(MSG_Y), "Caught it!", GAME_UI_INK);
     } else if (s_fled) {
-        render_text(12, Y(MSG_Y), "跑掉了", GAME_UI_INK);
+        render_text(12, Y(MSG_Y), "It got away", GAME_UI_INK);
     } else if (s_return_to_battle) {
-        render_text(12, Y(MSG_Y), "捕获失败，准备反击", GAME_UI_INK);
+        render_text(12, Y(MSG_Y), "Missed! It strikes back", GAME_UI_INK);
     } else if (s_box_full) {
-        render_text(12, Y(MSG_Y), "仓库已满，可手动替换", GAME_UI_INK);
+        render_text(12, Y(MSG_Y), "Box full. Swap by hand", GAME_UI_INK);
     } else if (s_save_failed) {
-        render_text(12, Y(MSG_Y), "保存失败，请重试", GAME_UI_INK);
+        render_text(12, Y(MSG_Y), "Save failed. Retry", GAME_UI_INK);
     } else if (s_no_ball) {
-        render_text(12, Y(MSG_Y), "没有球了", GAME_UI_INK);
+        render_text(12, Y(MSG_Y), "No balls left", GAME_UI_INK);
     } else if (s_thrown) {
-        render_text(12, Y(MSG_Y), s_last.caught ? "命中" : "未命中", GAME_UI_INK);
+        render_text(12, Y(MSG_Y), s_last.caught ? "Hit" : "Miss", GAME_UI_INK);
     }
 
-    game_ui_footer(band_y, s_animating ? "捕获中……" : s_capture_pending ? "[C]重试保存" : s_hold_active ? "[C]继续"
-                : (s_caught || s_fled ? "[C]继续" : "A上 B下 C投球 长按B返回"));
+    game_ui_footer(band_y, s_animating ? "Catching..." : s_capture_pending ? "[C] Retry save" : s_hold_active ? "[C] Continue"
+                : (s_caught || s_fled ? "[C] Continue" : "A Up B Dn C Throw HoldB Back"));
 
     #undef Y
     screen_push_band(band_y);
@@ -419,8 +419,8 @@ static bool save_caught_result_at(unsigned slot,const mon_t *expected)
             s_replace_options=(box_view_options_t){.sort=BOX_SORT_LEVEL_ASC};load_replacements();
             s_replace_message=NULL;
         }else if(result==WORLD_CAPTURE_STALE){
-            s_replace=REPLACE_LIST;load_replacements();s_replace_message="伙伴已变，请重新选择";
-        }else s_replace_message="保存失败，请重试";
+            s_replace=REPLACE_LIST;load_replacements();s_replace_message="Pokemon changed. Pick again";
+        }else s_replace_message="Save failed. Retry";
         s_capture_pending = true;
         return false;
     }
@@ -626,7 +626,7 @@ void play_capture_key(bsp_btn_t btn, bsp_btn_ev_t ev)
             else if(confirm && s_replace_row<s_replace_count){
                 s_replace_slot=s_replace_ids[s_replace_row];
                 if(world_box_at(s_replace_slot,&s_replace_expected)){s_replace=REPLACE_CONFIRM;s_replace_choice=0;s_replace_message=NULL;}
-                else{load_replacements();s_replace_message="伙伴已变，请重新选择";}
+                else{load_replacements();s_replace_message="Pokemon changed. Pick again";}
             }
         }else{
             s_replace_choice=nav_list_selection(btn,ev,2,s_replace_choice);
@@ -676,7 +676,7 @@ void play_capture_key(bsp_btn_t btn, bsp_btn_ev_t ev)
         if (!battle_session_can_capture(&s_session)) { nav_go(PAGE_BATTLE); return; }
         world_inventory_snapshot(&s_inventory);
         if (s_inventory.quantity[s_ball] == 0) {
-            ESP_LOGI(TAG, "没有球了");
+            ESP_LOGI(TAG, "No balls left");
             s_no_ball = true;
             for (int y=(MSG_Y/BAND_H)*BAND_H;y<MSG_Y+16;y+=BAND_H) draw_band(y);
             return;

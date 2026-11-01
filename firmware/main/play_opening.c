@@ -141,13 +141,13 @@ static void draw_band(int band_y)
 
     char buf[64];
     if(s_handoff>12){
-        game_ui_title(band_y,"大木博士","");
+        game_ui_title(band_y,"Prof. Oak","");
         if(s_oak_ok)draw_ui_scaled_centered(120,Y(92),&s_oak_art,8,8,0,OAK_PALETTE);
         game_ui_box(band_y,0,TEXT_BOX_Y,240,112);
-        render_text(MARGIN,Y(176),"接下来，请选择",GAME_UI_INK);
-        render_text(MARGIN,Y(200),"陪你出发的伙伴。",GAME_UI_INK);
-        render_text(MARGIN,Y(232),"它们都在等着你！",GAME_UI_INK);
-        game_ui_footer(band_y,"即将选择初始伙伴");
+        render_text(MARGIN,Y(176),"Next, please choose",GAME_UI_INK);
+        render_text(MARGIN,Y(200),"your starting partner.",GAME_UI_INK);
+        render_text(MARGIN,Y(232),"They're all waiting!",GAME_UI_INK);
+        game_ui_footer(band_y,"Pick your partner soon");
         if(s_handoff<=24)game_ui_fade_background(band_y,16-(s_handoff-12)*16/12);
         else if(s_handoff>84)game_ui_fade_background(band_y,(s_handoff-84)*16/12);
         screen_push_band(band_y);return;
@@ -160,7 +160,7 @@ static void draw_band(int band_y)
         buf[2] = '7';
         buf[3] = '\0';
     }
-    game_ui_title(band_y, "大木博士", buf);
+    game_ui_title(band_y, "Prof. Oak", buf);
 
     uint8_t mon = opening_show_mon(&s_opening);
     if (s_oak_ok && opening_show_oak(&s_opening)) {
@@ -200,7 +200,7 @@ static void draw_band(int band_y)
         left = left > len ? (uint16_t)(left - len) : 0;
     }
 
-    game_ui_footer(band_y, "C继续 长按B跳过");
+    game_ui_footer(band_y, "C: next  Hold B: skip");
 
     #undef Y
     if(s_handoff)game_ui_fade_background(band_y,s_handoff*16/12);

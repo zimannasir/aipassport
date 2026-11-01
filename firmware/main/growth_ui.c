@@ -30,7 +30,7 @@ static void draw_band(int y) {
     char text[96],right[24];
     screen_band_clear(GAME_UI_BG);
     snprintf(right,sizeof(right),"%u/%u",s_page+1,pages());
-    game_ui_title(y,"等级提升！",right);
+    game_ui_title(y,"Level up!",right);
     species_t sp;
     if(assets_species(s_event.species,&sp)) {
         uint16_t pal[4];assets_palette_variant(sp.palette,(s_event.flags&1)!=0,pal);
@@ -50,19 +50,19 @@ static void draw_band(int y) {
     game_ui_text_centered(y,8,148,224,16,text,GAME_UI_ACCENT);
     game_ui_box(y,8,172,224,104);
     if (s_evolution_ready && s_page == move_pages()) {
-        game_ui_text_centered(y,16,182,208,16,"已经可以进化了！",GAME_UI_INK);
-        game_ui_text_centered(y,16,212,208,16,"设为队首后进入照料",GAME_UI_INK);
-        game_ui_text_centered(y,16,242,208,16,"选择进化并按C确认",GAME_UI_MUTED);
+        game_ui_text_centered(y,16,182,208,16,"Ready to evolve!",GAME_UI_INK);
+        game_ui_text_centered(y,16,212,208,16,"Make it lead, open Care",GAME_UI_INK);
+        game_ui_text_centered(y,16,242,208,16,"Pick Evolve, press C",GAME_UI_MUTED);
     } else {
-    game_ui_text_centered(y,16,182,208,16,s_count?"学会了新招式！":"伙伴变得更强了！",GAME_UI_INK);
+    game_ui_text_centered(y,16,182,208,16,s_count?"Learned a new move!":"Your Pokemon grew stronger!",GAME_UI_INK);
     for(unsigned i=0;i<3&&s_page*3+i<s_count;i++) {
         move_t m;if(!combat_move(s_moves[s_page*3+i],&m))continue;
         snprintf(text,sizeof(text),"%.*s",m.name_zh_len,m.name_zh);
         game_ui_text_centered(y,16,204+i*22,208,16,text,GAME_UI_INK);
     }
-    if(!s_count)game_ui_text_centered(y,16,224,208,16,"继续冒险，解锁更多招式",GAME_UI_MUTED);
+    if(!s_count)game_ui_text_centered(y,16,224,208,16,"Explore to unlock moves",GAME_UI_MUTED);
     }
-    game_ui_footer(y,pages()>1?"A上 B下 C继续 长按B返回":"C继续 长按B返回");
+    game_ui_footer(y,pages()>1?"A Up B Dn C Go Hold B Back":"C: next  Hold B: back");
 }
 static void close_notice(void) {
     s_active=false;screen_set_overlay(NULL);screen_redraw_current();

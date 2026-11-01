@@ -38,10 +38,10 @@ SCREEN_ASSERT_ALLOW_CROSS_BAND(menu_option_names, OPTION_Y, 16);
 SCREEN_ASSERT_ALLOW_CROSS_BAND(menu_option_screen, OPTION_Y + OPTION_STEP, 16);
 SCREEN_ASSERT_ALLOW_CROSS_BAND(menu_option_return, OPTION_Y + OPTION_STEP * 3, 16);
 
-static const char *LABELS[MENU_COUNT] = {"图鉴", "队伍", "道具", "照料", "挑战", "选项", "成就", "探索", "秘境", "城都", "雷达", "漫游", "关闭"};
+static const char *LABELS[MENU_COUNT] = {"Pokedex", "Party", "Items", "Care", "Battle", "Options", "Awards", "Explore", "Dungeon", "Johto", "Radar", "Roam", "Close"};
 static const char *DESCRIPTIONS[MENU_COUNT] = {
-    "查看见过和捕获的伙伴", "查看伙伴 选择出战队首", "查看和使用随身道具",
-    "喂食 玩耍 等待体力恢复", "道馆 徽章 联盟 赤红", "译名 声音与屏幕设置", "查看成长 领取成就奖励", "选择路线 追踪野生伙伴", "携带伙伴闯关 获取奖励", "新的伙伴与城都调查", "附近信号 发现闪光伙伴", "走进地图 观察痕迹", "回到冒险中",
+    "Seen and caught Pokemon", "View Pokemon, pick leader", "View and use items",
+    "Feed, play, rest", "Gyms, badges, League, Red", "Names, sound, screen", "Progress and rewards", "Pick a route, track Pokemon", "Take Pokemon in for rewards", "New Pokemon, Johto surveys", "Nearby signals, shinies", "Walk the map, find traces", "Back to the adventure",
 };
 static uint8_t s_selected;
 static bool s_johto_visible;
@@ -66,146 +66,146 @@ static unsigned s_claimable;
 static void draw_options(int band_y)
 {
     char value[64];
-    game_ui_title(band_y, "选项", "");
+    game_ui_title(band_y, "Options", "");
     game_ui_box(band_y, 8, 40, 224, 200);
-    render_text(40, OPTION_Y - band_y, "译名", GAME_UI_INK);
-    snprintf(value, sizeof(value), "%s", pokemon_names_style_label());
+    render_text(40, OPTION_Y - band_y, "Names", GAME_UI_INK);
+    snprintf(value, sizeof(value), "English");
     render_text(212 - render_text_width(value), OPTION_Y - band_y, value, GAME_UI_ACCENT);
-    render_text(40, OPTION_Y + OPTION_STEP - band_y, "立即熄屏", GAME_UI_INK);
-    render_text(40, OPTION_Y + OPTION_STEP * 2 - band_y, "静音", GAME_UI_INK);
+    render_text(40, OPTION_Y + OPTION_STEP - band_y, "Screen off now", GAME_UI_INK);
+    render_text(40, OPTION_Y + OPTION_STEP * 2 - band_y, "Mute", GAME_UI_INK);
     render_text(196, OPTION_Y + OPTION_STEP * 2 - band_y,
-                audio_settings_muted() ? "开" : "关", GAME_UI_ACCENT);
-    render_text(40, OPTION_Y + OPTION_STEP * 3 - band_y, "音量", GAME_UI_INK);
+                audio_settings_muted() ? "On" : "Off", GAME_UI_ACCENT);
+    render_text(40, OPTION_Y + OPTION_STEP * 3 - band_y, "Volume", GAME_UI_INK);
     snprintf(value, sizeof(value), "%u%%", audio_settings_volume());
     render_text(212-render_text_width(value), OPTION_Y + OPTION_STEP * 3-band_y, value, GAME_UI_ACCENT);
-    render_text(40, OPTION_Y + OPTION_STEP * 4 - band_y, "备份存档", GAME_UI_INK);
-    render_text(40, OPTION_Y + OPTION_STEP * 5 - band_y, "导入存档", GAME_UI_INK);
-    render_text(40, OPTION_Y + OPTION_STEP * 6 - band_y, "Wi-Fi校时", GAME_UI_INK);
-    render_text(40, OPTION_Y + OPTION_STEP * OPTION_BRIGHTNESS - band_y, "屏幕亮度", GAME_UI_INK);
+    render_text(40, OPTION_Y + OPTION_STEP * 4 - band_y, "Back up save", GAME_UI_INK);
+    render_text(40, OPTION_Y + OPTION_STEP * 5 - band_y, "Import save", GAME_UI_INK);
+    render_text(40, OPTION_Y + OPTION_STEP * 6 - band_y, "Wi-Fi sync", GAME_UI_INK);
+    render_text(40, OPTION_Y + OPTION_STEP * OPTION_BRIGHTNESS - band_y, "Brightness", GAME_UI_INK);
     snprintf(value, sizeof(value), "%u%%", display_settings_brightness());
     render_text(212-render_text_width(value), OPTION_Y + OPTION_STEP * OPTION_BRIGHTNESS-band_y, value, GAME_UI_ACCENT);
-    render_text(40, OPTION_Y + OPTION_STEP * OPTION_BATTERY-band_y, "电量显示", GAME_UI_INK);
+    render_text(40, OPTION_Y + OPTION_STEP * OPTION_BATTERY-band_y, "Battery icon", GAME_UI_INK);
     render_text(196, OPTION_Y + OPTION_STEP * OPTION_BATTERY-band_y,
-                display_settings_battery_visible() ? "开" : "关", GAME_UI_ACCENT);
-    render_text(40, OPTION_Y + OPTION_STEP * OPTION_RETURN - band_y, "返回菜单", GAME_UI_INK);
+                display_settings_battery_visible() ? "On" : "Off", GAME_UI_ACCENT);
+    render_text(40, OPTION_Y + OPTION_STEP * OPTION_RETURN - band_y, "Back to menu", GAME_UI_INK);
     game_ui_cursor(band_y, 20, OPTION_Y + s_option_selected * OPTION_STEP + 4);
     const char *hint;
     if (s_option_selected == OPTION_MUTE) {
-        snprintf(value, sizeof(value), "%s", audio_settings_muted() ? "音乐和音效已关闭" : "音乐和音效已开启");
-        hint = s_audio_save_failed ? "保存失败 按确认重试" : "按确认切换 重启后保留";
+        snprintf(value, sizeof(value), "%s", audio_settings_muted() ? "Music and SFX are off" : "Music and SFX are on");
+        hint = s_audio_save_failed ? "Save failed. C to retry" : "C to toggle. Kept on reboot";
     } else if (s_option_selected == OPTION_VOLUME) {
-        snprintf(value, sizeof(value), "%s", audio_settings_muted() ? "静音开启 调整后仍静音" : "音乐 音效 遇敌提示");
-        hint = s_audio_save_failed ? "保存失败 请重试" : "音量设置重启后保留";
+        snprintf(value, sizeof(value), "%s", audio_settings_muted() ? "Muted. Stays muted" : "Music, SFX, alerts");
+        hint = s_audio_save_failed ? "Save failed. Retry" : "Volume kept on reboot";
     } else if (s_option_selected == OPTION_BRIGHTNESS) {
-        snprintf(value, sizeof(value), "按C调节屏幕亮度");
-        hint = "范围10%-100% 调整后保留";
+        snprintf(value, sizeof(value), "C to adjust brightness");
+        hint = "10%-100%. Saved on change";
     } else if (s_option_selected == OPTION_BATTERY) {
-        snprintf(value, sizeof(value), "菜单与照料页显示电量");
-        hint = s_display_save_failed ? "保存失败 按确认重试" : "按确认切换 重启后保留";
+        snprintf(value, sizeof(value), "Show battery on menu/care");
+        hint = s_display_save_failed ? "Save failed. C to retry" : "C to toggle. Kept on reboot";
     } else if (s_option_selected == OPTION_BACKUP || s_option_selected == OPTION_IMPORT) {
-        snprintf(value,sizeof(value),"USB连接电脑管理存档");
-        hint=s_option_selected==OPTION_IMPORT?"电脑选文件 设备确认覆盖":"先打开电脑存档管理页";
+        snprintf(value,sizeof(value),"Manage saves over USB");
+        hint=s_option_selected==OPTION_IMPORT?"Pick file on PC, confirm here":"Open PC save page first";
     } else if (s_option_selected == OPTION_WIFI) {
-        snprintf(value,sizeof(value),"联网补回关机期间的体能");
-        hint="首次请设置家庭Wi-Fi";
+        snprintf(value,sizeof(value),"Recover stamina while off");
+        hint="Set up home Wi-Fi first";
     } else if (s_option_selected == OPTION_NAMES) {
-        snprintf(value, sizeof(value), "设置只影响显示名称");
-        hint = "译名设置本次运行有效";
+        snprintf(value, sizeof(value), "Names are shown in English");
+        hint = "Fixed in this version";
     } else {
-        snprintf(value, sizeof(value), "%lu秒无操作自动熄屏", (unsigned long)(screen_idle_timeout_ms() / 1000));
-        hint = s_option_selected == OPTION_SCREEN_OFF ? "按确认熄屏 任意键亮屏" : "返回上一级菜单";
+        snprintf(value, sizeof(value), "Screen off after %lus idle", (unsigned long)(screen_idle_timeout_ms() / 1000));
+        hint = s_option_selected == OPTION_SCREEN_OFF ? "C: screen off. Any key wakes" : "Back to the previous menu";
     }
     game_ui_text_centered(band_y, 12, 240, 216, 16, value, GAME_UI_MUTED);
     game_ui_text_centered(band_y, 12, 260, 216, 16, hint, GAME_UI_INK);
-    game_ui_footer(band_y, s_volume_edit ? "[A]加 [B]减 [C]完成" : GAME_UI_NAV_HINT);
+    game_ui_footer(band_y, s_volume_edit ? "[A]+ [B]- [C]Done" : GAME_UI_NAV_HINT);
 }
 
 static void draw_brightness(int band_y)
 {
     char value[8];
     uint8_t brightness = display_settings_brightness();
-    game_ui_title(band_y, "屏幕亮度", "");
+    game_ui_title(band_y, "Brightness", "");
     game_ui_box(band_y, 8, 56, 224, 160);
-    game_ui_text_centered(band_y, 24, 76, 192, 16, "当前亮度", GAME_UI_MUTED);
+    game_ui_text_centered(band_y, 24, 76, 192, 16, "Brightness", GAME_UI_MUTED);
     snprintf(value, sizeof(value), "%u%%", brightness);
     game_ui_text_centered(band_y, 24, 112, 192, 16, value, GAME_UI_ACCENT);
     game_ui_meter(band_y, 28, 148, 184, brightness);
     render_text(28, 184 - band_y, "10%", GAME_UI_MUTED);
     render_text(212 - render_text_width("100%"), 184 - band_y, "100%", GAME_UI_MUTED);
     game_ui_text_centered(band_y, 12, 236, 216, 16,
-                          s_display_save_failed ? "保存失败 请重试" : "调整立即生效并保存",
+                          s_display_save_failed ? "Save failed. Retry" : "Applies and saves at once",
                           GAME_UI_INK);
-    game_ui_text_centered(band_y, 12, 260, 216, 16, "长按B返回", GAME_UI_MUTED);
-    game_ui_footer(band_y, "[A]加 [B]减 [C]完成");
+    game_ui_text_centered(band_y, 12, 260, 216, 16, "Hold B: back", GAME_UI_MUTED);
+    game_ui_footer(band_y, "[A]+ [B]- [C]Done");
 }
 
 static void draw_backup(int band_y)
 {
     usb_backup_state_t st=usb_backup_state();
     bool importing=usb_backup_import_mode_active();
-    game_ui_title(band_y,importing?"导入存档":"备份存档", "USB");
+    game_ui_title(band_y,importing?"Import save":"Back up save", "USB");
     if(st==USB_RESTORE_OFFER) {
-        game_ui_text_centered(band_y,8,64,224,16,"覆盖当前游戏存档？",GAME_UI_INK);
-        game_ui_text_centered(band_y,8,96,224,16,"确认后先备份当前进度",GAME_UI_MUTED);
-        game_ui_text_centered(band_y,8,120,224,16,"完成后设备会重新启动",GAME_UI_MUTED);
+        game_ui_text_centered(band_y,8,64,224,16,"Overwrite current save?",GAME_UI_INK);
+        game_ui_text_centered(band_y,8,96,224,16,"Progress is backed up first",GAME_UI_MUTED);
+        game_ui_text_centered(band_y,8,120,224,16,"Device restarts when done",GAME_UI_MUTED);
         game_ui_box(band_y,16,164,208,80);
-        render_text(56,180-band_y,"取消",GAME_UI_INK);
-        render_text(56,214-band_y,"确认覆盖",GAME_UI_INK);
+        render_text(56,180-band_y,"Cancel",GAME_UI_INK);
+        render_text(56,214-band_y,"Overwrite",GAME_UI_INK);
         game_ui_cursor(band_y,32,(s_import_accept?214:180)+4);
         game_ui_footer(band_y,GAME_UI_NAV_HINT);return;
     }
     game_ui_box(band_y,8,64,224,160);
-    const char *a="先打开电脑存档管理页", *b="连接设备并选择目录", *c="按C重试";
-    if(importing){a="在电脑选择备份文件";b="选择后在这里确认覆盖";c="长按B取消并返回";}
-    if(st==USB_BACKUP_SENDING) {a="正在传送存档";b="请保持USB连接";c="等待传送完成";}
-    else if(st==USB_BACKUP_WAIT_ACK) {a="电脑正在保存";b="等待文件写入完成";c="请保持网页打开";}
-    else if(st==USB_RESTORE_RECEIVING) {a="正在接收导入存档";b="当前进度已备份到电脑";c="请保持USB连接";}
-    else if(st==USB_RESTORE_STAGED) {a="存档已校验";b="正在重启并完成导入";c="请保持设备供电";}
-    else if(st==USB_BACKUP_DONE) {a="备份完成";b="文件已保存到电脑";c="原存档保持不变";}
-    else if(st==USB_BACKUP_FAILED) {a=importing?"导入未完成":"备份未完成";b="请检查连接和保存目录";c=importing?"原存档仍保留 请重新连接":"按C重试 原存档仍保留";}
+    const char *a="Open PC save page first", *b="Connect and pick a folder", *c="C to retry";
+    if(importing){a="Pick a backup file on PC";b="Then confirm here";c="Hold B: cancel and back";}
+    if(st==USB_BACKUP_SENDING) {a="Sending save";b="Keep USB connected";c="Wait for transfer";}
+    else if(st==USB_BACKUP_WAIT_ACK) {a="PC is saving";b="Wait for file write";c="Keep the page open";}
+    else if(st==USB_RESTORE_RECEIVING) {a="Receiving import";b="Progress backed up to PC";c="Keep USB connected";}
+    else if(st==USB_RESTORE_STAGED) {a="Save verified";b="Restarting to finish import";c="Keep device powered";}
+    else if(st==USB_BACKUP_DONE) {a="Backup done";b="File saved to PC";c="Original save unchanged";}
+    else if(st==USB_BACKUP_FAILED) {a=importing?"Import not done":"Backup not done";b="Check cable and folder";c=importing?"Save kept. Reconnect":"C to retry. Save kept";}
     game_ui_text_centered(band_y,12,88,216,16,a,GAME_UI_INK);
     game_ui_text_centered(band_y,12,128,216,16,b,GAME_UI_MUTED);
     game_ui_text_centered(band_y,12,184,216,16,c,GAME_UI_INK);
     bool busy=st==USB_BACKUP_SENDING||st==USB_BACKUP_WAIT_ACK||st==USB_RESTORE_RECEIVING||st==USB_RESTORE_STAGED;
-    game_ui_footer(band_y,busy?"请等待操作完成":importing?"长按B返回":"[C]备份 长按B返回");
+    game_ui_footer(band_y,busy?"Wait until finished":importing?"Hold B: back":"[C]Backup  Hold B: back");
 }
 
 static void draw_wifi(int band_y)
 {
     wifi_time_view_t v;wifi_time_view(&v);char text[64];
-    game_ui_title(band_y,"Wi-Fi校时","长按B返回");
+    game_ui_title(band_y,"Wi-Fi sync","Hold B: back");
     if(v.setup){
-        game_ui_text_centered(band_y,8,48,224,16,"手机连接以下临时热点",GAME_UI_INK);
+        game_ui_text_centered(band_y,8,48,224,16,"Phone: join this hotspot",GAME_UI_INK);
         game_ui_box(band_y,8,76,224,112);
         game_ui_text_centered(band_y,12,92,216,16,v.ssid,GAME_UI_INK);
-        snprintf(text,sizeof(text),"密码 %s",v.password);
+        snprintf(text,sizeof(text),"Password %s",v.password);
         game_ui_text_centered(band_y,12,120,216,16,text,GAME_UI_INK);
         game_ui_text_centered(band_y,12,156,216,16,"192.168.4.1",GAME_UI_ACCENT);
-        game_ui_text_centered(band_y,8,204,224,16,"浏览器打开上方地址",GAME_UI_INK);
-        game_ui_text_centered(band_y,8,232,224,16,"填写家庭Wi-Fi和密码",GAME_UI_MUTED);
-        game_ui_footer(band_y,"[C]关闭 长按B返回");return;
+        game_ui_text_centered(band_y,8,204,224,16,"Open the address above",GAME_UI_INK);
+        game_ui_text_centered(band_y,8,232,224,16,"Enter home Wi-Fi and password",GAME_UI_MUTED);
+        game_ui_footer(band_y,"[C]Close  Hold B: back");return;
     }
-    const char *status="尚未设置网络";
-    if(v.state==WIFI_TIME_CONNECTING)status="正在连接Wi-Fi";
-    else if(v.state==WIFI_TIME_WAITING)status="已联网 等待校时";
-    else if(v.state==WIFI_TIME_READY)status="时间已同步";
-    else if(v.state==WIFI_TIME_OFFLINE)status="未连上网络 将自动重试";
-    else if(v.state==WIFI_TIME_ERROR)status="校时或保存失败 请重试";
+    const char *status="Network not set up";
+    if(v.state==WIFI_TIME_CONNECTING)status="Connecting to Wi-Fi";
+    else if(v.state==WIFI_TIME_WAITING)status="Online. Waiting for sync";
+    else if(v.state==WIFI_TIME_READY)status="Time synced";
+    else if(v.state==WIFI_TIME_OFFLINE)status="Offline. Will retry";
+    else if(v.state==WIFI_TIME_ERROR)status="Sync or save failed. Retry";
     game_ui_box(band_y,8,56,224,88);
     game_ui_text_centered(band_y,12,72,216,16,status,GAME_UI_INK);
-    snprintf(text,sizeof(text),"本次补回体能 %u",v.recovered);
+    snprintf(text,sizeof(text),"Stamina recovered: %u",v.recovered);
     game_ui_text_centered(band_y,12,108,216,16,text,GAME_UI_ACCENT);
-    game_ui_text_centered(band_y,8,168,224,16,"开机联网后补回离线体能",GAME_UI_INK);
-    game_ui_text_centered(band_y,8,196,224,16,"约一小时恢复满",GAME_UI_MUTED);
-    game_ui_text_centered(band_y,8,224,224,16,"首次校时后开始计算",GAME_UI_MUTED);
-    game_ui_footer(band_y,"[A]重试 [C]配网");
+    game_ui_text_centered(band_y,8,168,224,16,"Recovers stamina when online",GAME_UI_INK);
+    game_ui_text_centered(band_y,8,196,224,16,"Full in about 1 hour",GAME_UI_MUTED);
+    game_ui_text_centered(band_y,8,224,224,16,"Counts after first sync",GAME_UI_MUTED);
+    game_ui_footer(band_y,"[A]Retry [C]Set up");
 }
 
 static void draw_main(int band_y)
 {
     char name[48], text[48];
     battery_ui_playtime_text(text, sizeof(text));
-    game_ui_title(band_y, "菜单", text);
+    game_ui_title(band_y, "Menu", text);
     species_t species;
     bool found = assets_species(s_world.species, &species);
     if (found) snprintf(name, sizeof(name), "%.*s", species.name_zh_len, species.name_zh);
@@ -222,9 +222,9 @@ static void draw_main(int band_y)
         assets_palette_variant(species.palette, shiny, palette);
         game_ui_sprite_centered(band_y, 8, 88, 104, 96, front, size, size, 1, palette);
     }
-    snprintf(text, sizeof(text), "队伍 %u/%u", s_party.count, PARTY_MAX);
+    snprintf(text, sizeof(text), "Party %u/%u", s_party.count, PARTY_MAX);
     game_ui_text_centered(band_y, 8, 196, 104, 16, text, GAME_UI_INK);
-    snprintf(text, sizeof(text), "捕获 %u", dex_count_caught(world_dex()));
+    snprintf(text, sizeof(text), "Caught %u", dex_count_caught(world_dex()));
     game_ui_text_centered(band_y, 8, 220, 104, 16, text, GAME_UI_MUTED);
 
     game_ui_box(band_y, MENU_X, MENU_Y, MENU_W, MENU_H);
@@ -237,7 +237,7 @@ static void draw_main(int band_y)
     }
     if(first)render_text(216,MENU_Y+2-band_y,"^",GAME_UI_MUTED);
     if(first+MENU_VISIBLE<menu_count())render_text(216,MENU_Y+MENU_H-16-band_y,"v",GAME_UI_MUTED);
-    if(s_selected==6&&s_claimable){snprintf(text,sizeof(text),"可领取 %u 项奖励",s_claimable);game_ui_text_centered(band_y,8,252,224,16,text,GAME_UI_INK);}
+    if(s_selected==6&&s_claimable){snprintf(text,sizeof(text),"%u rewards to claim",s_claimable);game_ui_text_centered(band_y,8,252,224,16,text,GAME_UI_INK);}
     else game_ui_text_centered(band_y, 8, 252, 224, 16, DESCRIPTIONS[menu_id(s_selected)], GAME_UI_MUTED);
     game_ui_footer(band_y, GAME_UI_NAV_HINT);
 }

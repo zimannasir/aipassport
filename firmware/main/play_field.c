@@ -24,16 +24,16 @@ static field_view_t status;
 static encounter_t found;
 static presentation_clock_t clock_state;
 static lv_timer_t *timer;
-static const char *const maps[]={"阿露福遗迹","捕虫公园","烧焦塔"};
+static const char *const maps[]={"Ruins of Alph","Bug-Catching Park","Burned Tower"};
 static const char *const spots[3][6]={
- {"调查告示","石壁拓纹","石缝足迹","回声石室","遗迹解谜","伙伴协作"},
- {"公园告示","花丛叶痕","池边足迹","隐蔽草丛","捕虫调查","原野路线"},
- {"守塔人","焦木纹路","温热灰烬","暗影长廊","三兽异象","伙伴协作"}
+ {"Survey notice","Wall rubbing","Crack tracks","Echo Chamber","Ruin puzzle","Teamwork"},
+ {"Park notice","Flower leaf marks","Pondside tracks","Hidden grass","Bug Survey","Field route"},
+ {"Tower keeper","Charred grain","Warm ashes","Shadow Hall","Beast omen","Teamwork"}
 };
 static const char *const notes[3][3][2]={
- {{"观察石壁和石缝的痕迹。","三处记录指向回声石室。"},{"墙上刻纹被风磨得发亮。","石室方向传来细小回声。"},{"石缝留有刚刚踩过的尘土。","似乎有伙伴躲在深处。"}},
- {{"观察叶片和池边的足迹。","三处记录指向隐蔽草丛。"},{"嫩叶的边缘留下圆形缺口。","附近的草丛轻轻晃动。"},{"湿泥上留下了细小脚印。","足迹朝公园深处延伸。"}},
- {{"守塔人：请观察木纹。","温热灰烬通向暗影长廊。"},{"焦黑的木柱里藏着新划痕。","阴影中似乎有东西移动。"},{"灰烬中留下温热的足迹。","深处传来一阵轻响。"}}
+ {{"Study the wall and cracks.","Three logs point to the Chamber."},{"Wind has polished the carvings.","Faint echoes from the chamber."},{"Fresh dust by the crack.","Something hides deep inside."}},
+ {{"Study leaves and pond tracks.","Three logs point to the grass."},{"Round bites on young leaves.","The nearby grass sways."},{"Small prints in wet mud.","Tracks lead deep into the park."}},
+ {{"Keeper: Look at the grain.","Warm ashes lead to the Hall."},{"New scratches on a charred post.","Something moves in the shadow."},{"Warm tracks in the ashes.","A faint sound from deep inside."}}
 };
 // Cells, collision routes and original pixels are generated together. No path
 // search, tile decompression or world-sized framebuffer in the device loop.
@@ -50,9 +50,9 @@ static void refresh(void){
 static void rect(int b,int x,int y,int w,int h,uint16_t c){int a=y>b?y:b,z=y+h<b+SCREEN_BAND_H?y+h:b+SCREEN_BAND_H;for(int yy=a;yy<z;yy++)for(int xx=x;xx<x+w;xx++)screen_px(xx,yy-b,c);}
 static void line(int b,int x,int y,int xx,int yy,uint16_t c){int dx=abs(xx-x),sx=x<xx?1:-1,dy=-abs(yy-y),sy=y<yy?1:-1,e=dx+dy;for(;;){screen_px(x,y-b,c);if(x==xx&&y==yy)break;int e2=2*e;if(e2>=dy){e+=dy;x+=sx;}if(e2<=dx){e+=dx;y+=sy;}}}
 static void text(int b,int y,const char *s,uint16_t c){game_ui_text_centered(b,8,y,224,16,s,c);}
-static const char *failure(void){switch(error){case FIELD_LOCKED:return "取得对应城都徽章后开放";case FIELD_BUSY:return "请先结束当前对战或活动";case FIELD_FULL:return "遭遇已满 请先处理伙伴";case FIELD_NO_STAMINA:return "体能不足 需要 5 点";case FIELD_SAVE_FAILED:return "保存失败 未消耗 请重试";case FIELD_COOLDOWN:return "附近伙伴还在休息";case FIELD_NO_SIGNAL:return "等待附近 Wi-Fi 信号";case FIELD_NEED_CLUES:return "先观察告示和两处痕迹";default:return "";}}
+static const char *failure(void){switch(error){case FIELD_LOCKED:return "Opens with its Johto badge";case FIELD_BUSY:return "End the battle/event first";case FIELD_FULL:return "Queue full. Deal with it first";case FIELD_NO_STAMINA:return "Low stamina. Need 5";case FIELD_SAVE_FAILED:return "Save failed. Nothing spent";case FIELD_COOLDOWN:return "Nearby Pokemon are resting";case FIELD_NO_SIGNAL:return "Waiting for nearby Wi-Fi";case FIELD_NEED_CLUES:return "Check the notice and 2 traces";default:return "";}}
 static void radar(int b){
- char t[64];game_ui_title(b,"遭遇雷达",status.simulated?"模拟信号":"Wi-Fi");
+ char t[64];game_ui_title(b,"Radar",status.simulated?"Simulated":"Wi-Fi");
  game_ui_box(b,8,40,224,152);rect(b,16,48,208,136,0xef9a);
  // Stylised sweep, deliberately no compass, metres or false GPS coordinates.
  static const int ring[16][2]={{0,-60},{23,-55},{42,-42},{55,-23},{60,0},{55,23},{42,42},{23,55},{0,60},{-23,55},{-42,42},{-55,23},{-60,0},{-55,-23},{-42,-42},{-23,-55}};
@@ -60,12 +60,12 @@ static void radar(int b){
  unsigned sweep=(clock_state.elapsed_ms/160)%16;line(b,120,116,120+ring[sweep][0],116+ring[sweep][1],0x3c68);
  for(unsigned i=0;i<status.signals&&i<12;i++){unsigned a=(i*7+status.place)%16;int scale=1+i%3;rect(b,118+ring[a][0]*scale/4,114+ring[a][1]*scale/4,3,3,0x3c68);}
  rect(b,118,114,5,5,GAME_UI_ACCENT);
- snprintf(t,sizeof(t),"附近信号 %u  体能 %u",status.signals,status.stamina);text(b,200,t,GAME_UI_INK);
+ snprintf(t,sizeof(t),"Signals %u  Stamina %u",status.signals,status.stamina);text(b,200,t,GAME_UI_INK);
  unsigned wait=field_remaining(&status.state,FIELD_RADAR,status.online_s);
- if(wait)snprintf(t,sizeof(t),"下次追踪 %u:%02u",wait/60,wait%60);else snprintf(t,sizeof(t),"%s",status.signals?"可以追踪 消耗 5 体能":"扫描中 请稍候");text(b,222,t,GAME_UI_INK);
- text(b,244,error?failure():"闪光 1/32 · 连胜另有加成",error?C_HP_RED:GAME_UI_ACCENT);
- text(b,264,"环境感应 不代表方向距离",GAME_UI_MUTED);
- game_ui_footer(b,selection?"A/B选择 C查看遭遇 长按B返回":"A/B选择 C追踪 长按B返回");
+ if(wait)snprintf(t,sizeof(t),"Next track %u:%02u",wait/60,wait%60);else snprintf(t,sizeof(t),"%s",status.signals?"Ready. Costs 5 stamina":"Scanning. Please wait");text(b,222,t,GAME_UI_INK);
+ text(b,244,error?failure():"Shiny 1/32. Streak adds more",error?C_HP_RED:GAME_UI_ACCENT);
+ text(b,264,"Environment sense, not a map",GAME_UI_MUTED);
+ game_ui_footer(b,selection?"A/B pick C View HoldB Back":"A/B pick C Track HoldB Back");
 }
 // Integer scaling preserves the original pixel silhouette. Clip BOTH map and
 // LCD band before reading pixels, so 20-row bands never scan the full scene.
@@ -128,33 +128,33 @@ static void map_art(int b){
 }
 static void map_draw(int b){
  char t[64];unsigned n=status.state.visited[map_id];n=(n&1)+((n>>1)&1)+((n>>2)&1);
- snprintf(t,sizeof(t),"记录 %u/3",n);game_ui_title(b,maps[map_id],t);map_art(b);
+ snprintf(t,sizeof(t),"Logs %u/3",n);game_ui_title(b,maps[map_id],t);map_art(b);
  // Gold frame-1 dialogue tiles; keep readable margins at native 240x320.
  game_ui_box(b,0,224,240,96);
  snprintf(t,sizeof(t),"%u/6 %s",point+1,spots[map_id][point]);render_text(16,236-b,t,GAME_UI_INK);
- if(error){game_ui_text_fitted(b,16,258,208,failure(),C_HP_RED);render_text(16,278-b,"未消耗资源 可以稍后重试",GAME_UI_MUTED);}
+ if(error){game_ui_text_fitted(b,16,258,208,failure(),C_HP_RED);render_text(16,278-b,"Nothing spent. Retry later",GAME_UI_MUTED);}
  else if(point<3){
   game_ui_text_fitted(b,16,258,208,notes[map_id][point][0],GAME_UI_INK);
   game_ui_text_fitted(b,16,278,208,notes[map_id][point][1],GAME_UI_INK);
-  if(status.state.visited[map_id]&(1u<<point))render_text(176,236-b,"已记录",GAME_UI_MUTED);
+  if(status.state.visited[map_id]&(1u<<point))render_text(176,236-b,"Logged",GAME_UI_MUTED);
  }else if(point==3){
   unsigned wait=field_remaining(&status.state,map_id,status.online_s);
-  if(wait)snprintf(t,sizeof(t),"休息中 %u:%02u",wait/60,wait%60);else snprintf(t,sizeof(t),"三处记录齐全后 消耗 5");
+  if(wait)snprintf(t,sizeof(t),"Resting %u:%02u",wait/60,wait%60);else snprintf(t,sizeof(t),"After 3 logs, costs 5");
   game_ui_text_fitted(b,16,258,208,t,GAME_UI_INK);
-  game_ui_text_fitted(b,16,278,208,"闪光 1/24 连胜另有加成",GAME_UI_INK);
+  game_ui_text_fitted(b,16,278,208,"Shiny 1/24. Streak adds more",GAME_UI_INK);
  }else{
-  game_ui_text_fitted(b,16,258,208,point==4?(map_id==1?"与工作人员开始捕虫调查":"进入现场 继续调查剧情"):"向研究员询问伙伴协作",GAME_UI_INK);
-  render_text(16,278-b,"已有调查进度会保留",GAME_UI_MUTED);
+  game_ui_text_fitted(b,16,258,208,point==4?(map_id==1?"Start the survey with staff":"Enter the site, continue story"):"Ask the researcher about teamwork",GAME_UI_INK);
+  render_text(16,278-b,"Survey progress is kept",GAME_UI_MUTED);
  }
- const char *hint=walking?"行进中  长按B返回":at_target()?"A/B选择 C互动 长按B返回":"A/B选择 C前往 长按B返回";
+ const char *hint=walking?"Walking  Hold B: back":at_target()?"A/B pick C Use HoldB Back":"A/B pick C Go HoldB Back";
  game_ui_text_centered(b,8,299,224,16,hint,GAME_UI_INK);
 }
 static void draw_band(int b){
  screen_band_clear(GAME_UI_BG);
  if(view==RADAR)radar(b);
  else if(view==MAP)map_draw(b);
- else if(view==LIST){game_ui_title(b,"地图漫游","城都");text(b,48,"走到现场 观察伙伴的痕迹",GAME_UI_MUTED);for(unsigned i=0;i<3;i++){int y=82+i*54;game_ui_box(b,12,y,216,46);render_text(36,y+6-b,maps[i],GAME_UI_INK);char t[48];snprintf(t,sizeof(t),status.open_maps&(1u<<i)?"开放 · 闪光 1/24":"需要 %u 枚城都徽章",field_map_badges(i));render_text(36,y+25-b,t,GAME_UI_MUTED);if(selection==i)game_ui_cursor(b,20,y+11);}text(b,254,error?failure():"观察免费 搜寻消耗 5 体能",error?C_HP_RED:GAME_UI_MUTED);game_ui_footer(b,GAME_UI_NAV_HINT);}
- else{game_ui_title(b,"发现伙伴",found.is_shiny?"闪光":"");species_t sp;uint8_t size;const uint8_t *sprite=assets_front_sprite(found.species_id,&size);char t[64];if(assets_species(found.species_id,&sp)){uint16_t pal[4];assets_palette_variant(sp.palette,found.is_shiny,pal);if(sprite)game_ui_sprite_centered(b,16,50,208,126,sprite,size,size,2,pal);snprintf(t,sizeof(t),"%.*s Lv%u",sp.name_zh_len,sp.name_zh,found.level);text(b,194,t,GAME_UI_INK);}text(b,224,"已经加入遭遇列表",GAME_UI_INK);text(b,250,"可以战斗或直接尝试捕获",GAME_UI_MUTED);game_ui_footer(b,"C查看遭遇 长按B继续探索");}
+ else if(view==LIST){game_ui_title(b,"Map Roam","Johto");text(b,48,"Walk there, read the traces",GAME_UI_MUTED);for(unsigned i=0;i<3;i++){int y=82+i*54;game_ui_box(b,12,y,216,46);render_text(36,y+6-b,maps[i],GAME_UI_INK);char t[48];snprintf(t,sizeof(t),status.open_maps&(1u<<i)?"Open - Shiny 1/24":"Needs %u Johto badges",field_map_badges(i));render_text(36,y+25-b,t,GAME_UI_MUTED);if(selection==i)game_ui_cursor(b,20,y+11);}text(b,254,error?failure():"Look free. Search costs 5",error?C_HP_RED:GAME_UI_MUTED);game_ui_footer(b,GAME_UI_NAV_HINT);}
+ else{game_ui_title(b,"Pokemon found",found.is_shiny?"Shiny":"");species_t sp;uint8_t size;const uint8_t *sprite=assets_front_sprite(found.species_id,&size);char t[64];if(assets_species(found.species_id,&sp)){uint16_t pal[4];assets_palette_variant(sp.palette,found.is_shiny,pal);if(sprite)game_ui_sprite_centered(b,16,50,208,126,sprite,size,size,2,pal);snprintf(t,sizeof(t),"%.*s Lv%u",sp.name_zh_len,sp.name_zh,found.level);text(b,194,t,GAME_UI_INK);}text(b,224,"Added to the queue",GAME_UI_INK);text(b,250,"Fight it or try to catch it",GAME_UI_MUTED);game_ui_footer(b,"C: view  Hold B: explore on");}
  screen_push_band(b);
 }
 static void draw(void){for(int b=0;b<SCREEN_H;b+=SCREEN_BAND_H)draw_band(b);}

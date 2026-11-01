@@ -48,15 +48,15 @@ bool activity_valid(const activity_store_t *s){
  return true;
 }
 bool activity_expedition(unsigned k){return k>=ACT_SEA&&k<=ACT_TOWER;}
-const char *activity_name(unsigned k){return k==ACT_BUG?"捕虫调查":k==ACT_ICE?"冰雪救援":k==ACT_TOWER?"铃铛塔试炼":"漩涡远征";}
+const char *activity_name(unsigned k){return k==ACT_BUG?"Bug Survey":k==ACT_ICE?"Ice Rescue":k==ACT_TOWER?"Bell Tower Trial":"Whirl Expedition";}
 unsigned activity_min_level(unsigned k,bool hard){return k==ACT_BUG?35:k==ACT_ICE?(hard?72:58):k==ACT_TOWER?(hard?82:70):hard?70:55;}
 unsigned activity_max_level(unsigned k,bool hard){return k==ACT_BUG?50:k==ACT_ICE?(hard?92:78):k==ACT_TOWER?(hard?100:92):hard?90:75;}
 bool activity_open(unsigned k,const johto_state_t *j){return j&&j->phase>=JOHTO_ACTIVE&&k>=1&&k<=4&&johto_badges(j)>=(unsigned[]){0,2,6,5,7}[k];}
 unsigned activity_rarity(unsigned id){species_t sp;if(!assets_species(id,&sp))return 1;unsigned n=sp.hp+sp.attack+sp.defense+sp.special+sp.speed;return n<250?1:n<330?2:n<400?3:n<470?4:5;}
 unsigned activity_observations(const activity_run_t *r){unsigned n=0;for(unsigned i=0;i<15;i++)n+=!!(r->observed&(1u<<i));return n;}
 unsigned activity_score(const activity_run_t *r){return activity_observations(r)*10+(r->candidate.species_id?20+activity_rarity(r->candidate.species_id)*10:0);}
-const char *activity_habitat(unsigned i){return (const char*[]){"草丛足迹","树干抓痕","花丛飞影"}[i%3];}
-const char *activity_habitat_hint(unsigned i){return (const char*[]){"幼虫与圆丝蛛的足迹","螳螂与甲虫留下的抓痕","蝴蝶与蜻蜓在花间飞舞"}[i%3];}
+const char *activity_habitat(unsigned i){return (const char*[]){"Grass Tracks","Trunk Scratches","Flower Flutter"}[i%3];}
+const char *activity_habitat_hint(unsigned i){return (const char*[]){"Larva and spider tracks","Mantis and beetle scratches","Butterflies and dragonflies"}[i%3];}
 static bool sea_battle(activity_run_t *r,bool fresh){
  uint16_t hp[3],max[3];uint8_t status[3];
  for(unsigned i=0;i<3;i++){const combat_mon_t *m=&r->battle.session.sides[0].mons[i];hp[i]=m->hp;max[i]=m->max_hp;status[i]=m->status;}

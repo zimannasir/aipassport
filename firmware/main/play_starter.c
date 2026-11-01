@@ -36,8 +36,8 @@ static void draw_band(int band_y)
     screen_band_clear(GAME_UI_BG);
     char buf[48];
     snprintf(buf, sizeof(buf), "%u/%u", (unsigned)s_selection + 1, (unsigned)STARTER_COUNT);
-    game_ui_title(band_y, "选择伙伴", buf);
-    game_ui_text_centered(band_y, 12, 40, 216, 16, "让它成为你的伙伴", GAME_UI_MUTED);
+    game_ui_title(band_y, "Pick a Pokemon", buf);
+    game_ui_text_centered(band_y, 12, 40, 216, 16, "Make it your partner", GAME_UI_MUTED);
 
     species_t species;
     uint8_t size = 0;
@@ -56,15 +56,15 @@ static void draw_band(int band_y)
         }
     }
 
-    const char *note = "一起开始冒险吧";
-    const char *detail = "选好后按确认键";
-    if (s_saving) { note = "正在保存"; detail = "请稍候"; }
+    const char *note = "Start the adventure";
+    const char *detail = "Press C to confirm";
+    if (s_saving) { note = "Saving"; detail = "Please wait"; }
     else if (s_result == WORLD_STARTER_SAVE_FAILED) {
-        note = "保存失败"; detail = "确认重试 上下更换";
+        note = "Save failed"; detail = "C: retry  Up/Down: change";
     } else if (s_result == WORLD_STARTER_STORAGE_UNAVAILABLE) {
-        note = "存档不可用"; detail = "请重启后再试";
+        note = "Save unavailable"; detail = "Restart and retry";
     } else if (s_result == WORLD_STARTER_INVALID) {
-        note = "无法选择伙伴"; detail = "请按B或C更换";
+        note = "Can't pick Pokemon"; detail = "Press B or C to change";
     }
     game_ui_box(band_y, 8, 216, 224, 56);
     game_ui_text_centered(band_y, 16, NOTE_Y, 208, 16, note, GAME_UI_INK);

@@ -3,10 +3,10 @@
 #include <stddef.h>
 
 static const exploration_route_t ROUTES[4]={
- {"常青森林","草丛与树梢的伙伴",{"树上留下电击痕迹","草丛传来细小叫声","黄色身影一闪而过"},25,0x3ce7},
- {"月见山洞","寻找岩壁深处的伙伴",{"地面出现巨大拖痕","岩壁传来低沉回声","碎石正在轻轻震动"},95,0x9c53},
- {"海边浅滩","寻找潮汐带来的伙伴",{"沙滩留下宽阔足迹","海上传来悠长歌声","水面浮现蓝色背影"},131,0x3d7f},
- {"废弃电站","寻找电流中的伙伴",{"电线旁留下焦黑痕迹","远处传来电流声","黑黄身影穿过机房"},125,0xfde0},
+ {"Evergreen Forest","Grass and treetop Pokemon",{"Shock marks on a tree","Tiny cries in the grass","A yellow shape flashes by"},25,0x3ce7},
+ {"Moon Cave","Find Pokemon in the rock",{"Huge drag marks on the ground","Low echoes from the wall","Gravel is trembling"},95,0x9c53},
+ {"Seaside Shallows","Find tide-borne Pokemon",{"Wide tracks on the sand","A long song from the sea","A blue back rises in the water"},131,0x3d7f},
+ {"Abandoned Power Plant","Find Pokemon in the current",{"Scorch marks by the wires","Distant crackling current","A black-yellow shape crosses"},125,0xfde0},
 };
 // Curated route habitats. Rarity is encounter frequency, not a stat-total filter.
 static const uint8_t POOLS[4][5][16]={
@@ -17,15 +17,15 @@ static const uint8_t POOLS[4][5][16]={
 };
 const exploration_route_t *exploration_route(unsigned id) {const exploration_region_t *r=exploration_region(id);return r?&r->route:id<4?&ROUTES[id]:&ROUTES[0];}
 static const exploration_chapter_t CHAPTERS[EXPLORATION_CHAPTERS]={
- {"初出茅庐","开始冒险","大木：去寻找身边的伙伴","四条基础路线",0,0,{25,95,131,125},ITEM_BERRY},
- {"森林的守望者","获得一枚徽章","小刚：林中有挥舞双镰的影子","森林深处与叶之石",1,0,{123,95,131,125},ITEM_LEAF_STONE},
- {"潮汐的秘密","获得两枚徽章","小霞：退潮时留意古老贝壳","化石海滩与水之石",2,0,{123,95,138,125},ITEM_WATER_STONE},
- {"远古的回声","获得四枚徽章","研究员：岩层中传来翅膀声","远古岩窟与月之石",4,0,{123,142,138,125},ITEM_MOON_STONE},
- {"沉睡的电流","获得六枚徽章","工人：机房里的电流回来了","电站核心与雷之石",6,0,{123,142,138,135},ITEM_THUNDER_STONE},
- {"火焰的足迹","获得八枚徽章","夏伯：山中出现不灭的火羽","火焰鸟与火之石",8,0,{123,146,138,135},ITEM_FIRE_STONE},
- {"天空与海的传说","战胜全部四天王","阿渡：去追寻天空中的传说","冰雷双鸟与通讯机器",8,0x0f00,{149,146,144,145},ITEM_LINK_MACHINE},
- {"禁地的访客","战胜联盟冠军","大木：洞穴深处有未知力量","超梦线索与成长机器",8,0x1f00,{149,150,144,145},ITEM_GROWTH_MACHINE},
- {"最初的幻影","战胜赤红","赤红：森林里还有最后的谜","梦幻线索与大师球",8,0x3f00,{151,150,144,145},ITEM_MASTER},
+ {"Fresh Start","Begin the adventure","Oak: Find Pokemon nearby","4 starter routes",0,0,{25,95,131,125},ITEM_BERRY},
+ {"Forest Watcher","Earn 1 badge","Brock: A scythe shape in woods","Deep forest and Leaf Stone",1,0,{123,95,131,125},ITEM_LEAF_STONE},
+ {"Tide Secret","Earn 2 badges","Misty: Watch for old shells","Fossil beach, Water Stone",2,0,{123,95,138,125},ITEM_WATER_STONE},
+ {"Ancient Echo","Earn 4 badges","Researcher: Wings in the rock","Ancient cave, Moon Stone",4,0,{123,142,138,125},ITEM_MOON_STONE},
+ {"Sleeping Current","Earn 6 badges","Worker: Power is back","Plant core, Thunder Stone",6,0,{123,142,138,135},ITEM_THUNDER_STONE},
+ {"Footprints of Fire","Earn 8 badges","Blaine: Undying fire feathers","Fire bird, Fire Stone",8,0,{123,146,138,135},ITEM_FIRE_STONE},
+ {"Legend of Sky and Sea","Defeat the Elite Four","Lance: Chase the sky legend","Ice/Thunder birds, Link Cable",8,0x0f00,{149,146,144,145},ITEM_LINK_MACHINE},
+ {"Visitor of the Forbidden","Defeat the Champion","Oak: Unknown power in the cave","Mewtwo clues, Growth Machine",8,0x1f00,{149,150,144,145},ITEM_GROWTH_MACHINE},
+ {"The First Phantom","Defeat Red","Red: One last forest mystery","Mew clues, Master Ball",8,0x3f00,{151,150,144,145},ITEM_MASTER},
 };
 const exploration_chapter_t *exploration_chapter(unsigned chapter){return &CHAPTERS[chapter<EXPLORATION_CHAPTERS?chapter:0];}
 bool exploration_chapter_open(unsigned chapter,uint16_t defeated){
@@ -63,11 +63,11 @@ uint16_t exploration_focus(const exploration_state_t *s,uint16_t defeated) {
  return s->tracked_species&&exploration_species_open(s->tracked_species,defeated)&&exploration_habitat(s->tracked_species,NULL)==s->route?s->tracked_species:exploration_target(s->route,defeated);
 }
 const char *exploration_story(unsigned species,unsigned clue) {
- static const char *const fossil[]={"岩层露出了古老的纹路","发现尚有温度的化石","岩壁后传来了生命的回声"};
- static const char *const bird[]={"远处的天空突然变了颜色","羽毛中蕴藏着强大的力量","传说的羽翼就在前方"};
- static const char *const mewtwo[]={"找到了遗落的研究记录","未知的力量在洞穴中回响","实验室深处传来了呼唤"};
- static const char *const mew[]={"树叶间闪过粉色的影子","小小的足迹又突然消失","它似乎也在好奇地观察你"};
- static const char *const normal[]={"足迹延伸向路线深处","远处传来目标的叫声","目标就在附近"};
+ static const char *const fossil[]={"Ancient patterns in the rock","A fossil still warm","Life echoes behind the wall"};
+ static const char *const bird[]={"The far sky changes color","A feather holds great power","Legendary wings ahead"};
+ static const char *const mewtwo[]={"Found lost research notes","Unknown power echoes in the cave","A call from deep in the lab"};
+ static const char *const mew[]={"A pink shadow among leaves","Tiny tracks suddenly vanish","It seems curious about you"};
+ static const char *const normal[]={"Tracks lead deeper on the route","The target cries in the distance","The target is nearby"};
  if(clue>2)clue=2;
  return (species==151?mew:species==150?mewtwo:species>=144&&species<=146?bird:species>=138&&species<=142?fossil:normal)[clue];
 }
@@ -108,7 +108,7 @@ static bool pending(const enc_queue_t *q,unsigned species) {
  return false;
 }
 const char *exploration_special_name(unsigned special) {
- static const char *names[]={"", "伙伴发现补给", "伙伴特训", "闪光线索"};
+ static const char *names[]={"", "Pokemon found supplies", "Pokemon training", "Shiny clue"};
  return special<4?names[special]:names[0];
 }
 void exploration_special_apply(exploration_event_t *e,enc_queue_t *q,dex_t *dex,
@@ -284,14 +284,14 @@ bool exploration_updates_valid(const exploration_updates_t *u) {
  return true;
 }
 static const exploration_activity_t ACTIVITIES[8]={
- {"洞穴寻宝","小刚：沿岩壁寻找伙伴",1,12,ITEM_MOON_STONE,{74,27,50,35,66,95,104,111}},
- {"潮汐垂钓","小霞：退潮时有新的发现",2,19,ITEM_WATER_STONE,{60,54,72,98,116,90,138,140}},
- {"电站抢修","马志士：追踪失控的电流",3,26,ITEM_THUNDER_STONE,{25,81,100,137,82,101,125,26}},
- {"森林调查","莉佳：林中伙伴正在迁徙",0,32,ITEM_LEAF_STONE,{43,69,46,102,114,123,127,44}},
- {"毒雾调查","阿桔：找出毒雾的源头",3,39,ITEM_ENERGY_ROOT,{23,88,109,48,24,89,110,49}},
- {"幻影追踪","娜姿：感受幻影中的气息",3,43,ITEM_GROWTH_MACHINE,{63,96,92,64,97,93,122,65}},
- {"火山远征","夏伯：山中留下了火焰足迹",1,48,ITEM_FIRE_STONE,{4,37,58,77,5,38,78,126}},
- {"深层探险","坂木：深处还有强大的伙伴",1,53,ITEM_LINK_MACHINE,{95,112,31,34,76,142,115,143}}
+ {"Cave Treasure","Brock: Search along the wall",1,12,ITEM_MOON_STONE,{74,27,50,35,66,95,104,111}},
+ {"Tide Fishing","Misty: Low tide finds",2,19,ITEM_WATER_STONE,{60,54,72,98,116,90,138,140}},
+ {"Plant Repair","Surge: Track the stray current",3,26,ITEM_THUNDER_STONE,{25,81,100,137,82,101,125,26}},
+ {"Forest Survey","Erika: Forest Pokemon migrate",0,32,ITEM_LEAF_STONE,{43,69,46,102,114,123,127,44}},
+ {"Poison Fog Survey","Janine: Find the fog source",3,39,ITEM_ENERGY_ROOT,{23,88,109,48,24,89,110,49}},
+ {"Phantom Chase","Sabrina: Sense the phantom",3,43,ITEM_GROWTH_MACHINE,{63,96,92,64,97,93,122,65}},
+ {"Volcano Expedition","Blaine: Fire tracks in hills",1,48,ITEM_FIRE_STONE,{4,37,58,77,5,38,78,126}},
+ {"Deep Expedition","Giovanni: Strong ones below",1,53,ITEM_LINK_MACHINE,{95,112,31,34,76,142,115,143}}
 };
 const exploration_activity_t *exploration_activity(unsigned id){return id<8?&ACTIVITIES[id]:NULL;}
 bool exploration_activity_open(unsigned id,uint16_t defeated){return id<8&&(defeated&(1u<<id));}
@@ -356,51 +356,51 @@ bool exploration_dungeon_partner(uint32_t seed,uint32_t run_id,uint16_t defeated
 
 // First-generation expansion. Species keep their original rarity and story gates.
 static const exploration_region_t REGIONS[EXPLORATION_REGIONS]={
- {{"双子海岛","潮道与冰洞的歌声",{"退潮露出贝壳","冰面出现足迹","洞窟传来歌声"},131,0x45df},"潮汐洞窟","获得彩虹徽章",{"贝壳滩","冰洞口","悠长歌声"},1u<<3,35,45,2,ITEM_WATER_STONE,
+ {{"Twin Islands","Songs of tide and ice cave",{"Low tide shows shells","Tracks on the ice","A song from the cave"},131,0x45df},"Tide Cave","Earn the Rainbow Badge",{"Shell Beach","Ice Cave Mouth","Long Song"},1u<<3,35,45,2,ITEM_WATER_STONE,
   {86,90,116,120,117,80,73,87,91,121,134,131,124,130,144},{{91,117,131},{87,121,124},{80,134,130}},{{91,121,131},{87,124,131},{134,130,131}}},
- {{"幽灵高塔","月色下的迷路伙伴",{"烛火突然摇晃","楼上传来脚步","窗边闪过影子"},94,0x9b3f},"幻影试炼","获得粉红徽章",{"幽灵足迹","骨面伙伴","超能回声"},1u<<4,42,55,3,ITEM_LINK_MACHINE,
+ {{"Ghost Tower","Lost Pokemon in moonlight",{"Candles suddenly flicker","Footsteps from upstairs","A shadow by the window"},94,0x9b3f},"Phantom Trial","Earn the Pink Badge",{"Ghost Tracks","Bone-mask Pokemon","Psychic Echo"},1u<<4,42,55,3,ITEM_LINK_MACHINE,
   {92,96,104,93,97,64,94,105,122,65,108,124,115},{{94,97,105},{93,122,94},{105,108,115}},{{94,122,124},{105,108,115},{65,122,124}}},
- {{"野生原野","树痕与巨大的脚印",{"草丛留下足迹","树干出现镰痕","远处传来低鸣"},113,0x7dc9},"巡护远征","获得彩虹徽章",{"巨大脚印","树干镰痕","柔软足迹"},1u<<3,38,50,0,ITEM_MOON_STONE,
+ {{"Wild Fields","Tree marks and giant prints",{"Tracks in the grass","Scythe marks on a trunk","A low rumble far off"},113,0x7dc9},"Patrol Expedition","Earn the Rainbow Badge",{"Giant Prints","Trunk Scythe Marks","Soft Tracks"},1u<<3,38,50,0,ITEM_MOON_STONE,
   {29,32,102,44,70,49,47,114,123,83,31,34,113,115,128,127},{{123,127,115},{31,34,128},{114,113,115}},{{31,34,128,115},{123,114,127},{83,113,115}}},
- {{"磁轨矿坑","旧矿道里的电流",{"矿轨微微震动","机房亮起灯光","深处出现磁场"},125,0xbdf0},"钢铁回廊","获得金色徽章",{"旧矿道","供电机房","废弃仓库"},1u<<5,45,58,3,ITEM_THUNDER_STONE,
+ {{"Magnet Rail Mine","Current in old tunnels",{"The mine rails tremble","Lights switch on in the plant","A magnetic field deep below"},125,0xbdf0},"Steel Corridor","Earn the Gold Badge",{"Old Mine Tunnel","Power Room","Abandoned Warehouse"},1u<<5,45,58,3,ITEM_THUNDER_STONE,
   {81,100,137,111,82,101,75,26,95,112,76,125,135,128,142,145},{{82,95,125},{101,112,135},{76,137,128}},{{95,112,142},{125,135,128},{76,125,128}}},
- {{"火山遗迹","熔岩边的古老石阶",{"岩缝冒出热气","石阶留下爪痕","远处升起火羽"},126,0xfaa5},"熔岩试炼","获得深红徽章",{"熔岩石阶","温暖洞穴","高空火羽"},1u<<6,48,60,1,ITEM_FIRE_STONE,
+ {{"Volcano Ruins","Old steps by the lava",{"Steam from rock cracks","Claw marks on the steps","A fire feather rises far off"},126,0xfaa5},"Lava Trial","Earn the Crimson Badge",{"Lava Steps","Warm Cave","High Fire Feather"},1u<<6,48,60,1,ITEM_FIRE_STONE,
   {37,58,77,4,5,78,75,67,38,6,126,136,112,59,142,146},{{126,78,59},{112,6,136},{38,67,126}},{{112,126,142},{38,136,59},{6,126,146,59}}},
- {{"龙息山谷","循着幼龙的足迹",{"溪流留下鳞片","山岩出现翼痕","谷中响起龙吟"},148,0x6e39},"龙穴试炼","获得绿色徽章",{"溪流鳞片","峭壁翼痕","山谷龙吟"},1u<<7,50,65,2,ITEM_GROWTH_MACHINE,
+ {{"Dragon Breath Valley","Follow young dragon tracks",{"Scales left by the stream","Wing marks on the rock","A dragon roars in the valley"},148,0x6e39},"Dragon Den Trial","Earn the Green Badge",{"Stream Scales","Cliff Wing Marks","Valley Roar"},1u<<7,50,65,2,ITEM_GROWTH_MACHINE,
   {116,111,117,75,73,147,148,95,112,6,9,130,142,149,131},{{148,130,149},{95,142,149},{9,131,130}},{{147,148,130},{6,112,142},{148,131,149}}},
- {{"无人研究所","遗落的镜像实验",{"发现研究手稿","玻璃映出身影","未知力量苏醒"},137,0x7e7f},"镜像实验","战胜联盟冠军",{"培养舱","模拟机房","秘密档案"},1u<<12,60,75,3,ITEM_LINK_MACHINE,
+ {{"Empty Lab","A lost mirror experiment",{"Found research notes","A shape in the glass","Unknown power awakens"},137,0x7e7f},"Mirror Experiment","Defeat the Champion",{"Culture Pod","Sim Room","Secret Files"},1u<<12,60,75,3,ITEM_LINK_MACHINE,
   {137,132,63,64,82,93,65,94,122,135,136,134,113,143,150},{{65,94,143},{135,134,136},{122,113,150}},{{65,134,113},{94,135,143},{122,136,150,113}}},
- {{"白银雪岭","雪线之上的远征",{"雪地留下足迹","营地发现鳞片","峰顶传来歌声"},131,0xc71f},"雪岭远征","冠军与新地区研究",{"冰雪足迹","山间营地","峰顶传说"},1u<<12,65,85,2,ITEM_GROWTH_MACHINE,
+ {{"Silver Snow Ridge","Expedition above the snowline",{"Tracks in the snow","Scales found at camp","A song from the peak"},131,0xc71f},"Snow Ridge Trek","Champion and new-area study",{"Snow Tracks","Mountain Camp","Peak Legend"},1u<<12,65,85,2,ITEM_GROWTH_MACHINE,
   {86,90,117,80,75,87,91,121,148,95,131,143,149,144,124},{{87,131,143},{124,91,149},{121,148,144}},{{87,91,124},{95,148,143},{121,131,144,149}}},
 };
 const exploration_region_t *exploration_region(unsigned map){return map>=4&&map<EXPLORATION_MAPS?&REGIONS[map-4]:NULL;}
 // Explicit habitats: pool order must never change the meaning of a trail.
 // Their union stays within (and covers) the existing region research pool.
 static const exploration_trail_t TRAILS[EXPLORATION_REGIONS][3]={
- {{"贝壳滩",{90,91,120,121,134}},
-  {"冰洞口",{86,87,124,131,144}},
-  {"深海潮道",{116,117,73,80,130}}},
- {{"幽灵足迹",{92,93,94}},
-  {"骨面伙伴",{104,105,108,115}},
-  {"超能回声",{96,97,64,65,122,124}}},
- {{"巨大脚印",{29,32,31,34,128,115}},
-  {"树干镰痕",{102,44,70,49,47,114,123,127}},
-  {"草丛足迹",{29,32,49,83,113,115}}},
- {{"旧矿道",{111,75,95,112,76,142}},
-  {"供电机房",{81,100,82,101,26,125,135,145}},
-  {"废弃仓库",{137,111,75,112,76,128}}},
- {{"熔岩石阶",{75,67,112,126,142}},
-  {"暖风山坡",{37,38,58,59,77,78,136}},
-  {"火羽踪迹",{4,5,6,146}}},
- {{"溪流鳞片",{116,117,147,148,130}},
-  {"峭壁翼痕",{111,75,95,112,6,142}},
-  {"湖畔龙吟",{147,148,149,9,73,131}}},
- {{"培养舱",{132,63,64,65,113,143,150}},
-  {"模拟机房",{137,82,135,136,134}},
-  {"秘密档案",{63,64,93,65,94,122,150}}},
- {{"冰雪足迹",{86,87,90,91,124}},
-  {"山间营地",{75,95,80,143,117,148}},
-  {"峰顶传说",{117,80,148,121,131,149,144}}},
+ {{"Shell Beach",{90,91,120,121,134}},
+  {"Ice Cave Mouth",{86,87,124,131,144}},
+  {"Deep Tideway",{116,117,73,80,130}}},
+ {{"Ghost Tracks",{92,93,94}},
+  {"Bone-mask Pokemon",{104,105,108,115}},
+  {"Psychic Echo",{96,97,64,65,122,124}}},
+ {{"Giant Prints",{29,32,31,34,128,115}},
+  {"Trunk Scythe Marks",{102,44,70,49,47,114,123,127}},
+  {"Grass Tracks",{29,32,49,83,113,115}}},
+ {{"Old Mine Tunnel",{111,75,95,112,76,142}},
+  {"Power Room",{81,100,82,101,26,125,135,145}},
+  {"Abandoned Warehouse",{137,111,75,112,76,128}}},
+ {{"Lava Steps",{75,67,112,126,142}},
+  {"Warm Wind Slope",{37,38,58,59,77,78,136}},
+  {"Fire Feather Traces",{4,5,6,146}}},
+ {{"Stream Scales",{116,117,147,148,130}},
+  {"Cliff Wing Marks",{111,75,95,112,6,142}},
+  {"Lakeside Roar",{147,148,149,9,73,131}}},
+ {{"Culture Pod",{132,63,64,65,113,143,150}},
+  {"Sim Room",{137,82,135,136,134}},
+  {"Secret Files",{63,64,93,65,94,122,150}}},
+ {{"Snow Tracks",{86,87,90,91,124}},
+  {"Mountain Camp",{75,95,80,143,117,148}},
+  {"Peak Legend",{117,80,148,121,131,149,144}}},
 };
 // Temporary visitors broaden each area's ecology without moving its regular
 // habitats or adding new persistent counters. No legendary visitor shortcuts.

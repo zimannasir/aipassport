@@ -72,7 +72,7 @@ static void portrait(int y,uint8_t id,int x,int top,int scale){const uint8_t *da
  if(id==TRAINER_LAKE_BOSS){uint8_t size;species_t sp;data=assets_front_sprite(130,&size);if(data&&assets_species(130,&sp)){assets_palette_variant(sp.palette,true,pal);render_sprite_2bpp(x,top-y,data,size,scale,pal);}return;}
  trainer_art(id,&data,pal);
  if(data)render_sprite_2bpp(x,top-y,data,56,scale,pal);}
-static void title_hall(int y){char b[40];snprintf(b,sizeof(b),"徽章 %u/8",count_badges());game_ui_title(y,"挑战",b);}
+static void title_hall(int y){char b[40];snprintf(b,sizeof(b),"Badges %u/8",count_badges());game_ui_title(y,"Battle",b);}
 static unsigned hall_items(unsigned *ids){
  unsigned count=0;
  for(unsigned id=hall_first();id<hall_first()+(s_route_hall?3:TRAINER_COUNT);id++)
@@ -81,7 +81,7 @@ static unsigned hall_items(unsigned *ids){
  return count;
 }
 static void hall(int y){
- if(s_route_hall)game_ui_title(y,"训练家",exploration_route(s_route)->name);else title_hall(y);
+ if(s_route_hall)game_ui_title(y,"Trainers",exploration_route(s_route)->name);else title_hall(y);
  if(!s_route_hall)for(unsigned i=0;i<8;i++){
   const uint16_t obtained[4]={0,0x52aa,0xad55,0xffff},locked[4]={0xc618,0xdedb,0xef7d,0xffff};
   render_sprite_2bpp(14+i*27,38-y,trainer_badge_art(i),16,1,s_store.defeated&(1u<<i)?obtained:locked);
@@ -91,27 +91,27 @@ static void hall(int y){
  for(unsigned i=0;i<count;i++)if(ids[i]==s_selected)selected=i;
  unsigned top=selected/5*5;
  for(unsigned row=0;row<5&&top+row<count;row++){
-  unsigned id=ids[top+row];if(!s_route_hall&&id==TRAINER_COUNT)continue;int sy=76+row*(s_route_hall?48:30);const trainer_info_t *t=trainer_info(id);char level[12];snprintf(level,sizeof(level),trainer_rematch(&s_store,id)?"再战%u":"Lv%u",trainer_is_route(id)?trainer_route_level(id,&s_store,s_campaign_party.members,s_campaign_party.count):trainer_rematch(&s_store,id)?67+id:t->levels[t->count-1]);
+  unsigned id=ids[top+row];if(!s_route_hall&&id==TRAINER_COUNT)continue;int sy=76+row*(s_route_hall?48:30);const trainer_info_t *t=trainer_info(id);char level[12];snprintf(level,sizeof(level),trainer_rematch(&s_store,id)?"Rematch %u":"Lv%u",trainer_is_route(id)?trainer_route_level(id,&s_store,s_campaign_party.members,s_campaign_party.count):trainer_rematch(&s_store,id)?67+id:t->levels[t->count-1]);
   render_text(32,sy-y,t->name,GAME_UI_INK);
   render_text(228-render_text_width(level),sy-y,level,GAME_UI_MUTED);
-  if(s_route_hall){char count_text[48];snprintf(count_text,sizeof(count_text),"%u只伙伴 体能%u",t->count,trainer_stamina_cost(&s_store,id));render_text(32,sy+20-y,count_text,GAME_UI_MUTED);}
+  if(s_route_hall){char count_text[48];snprintf(count_text,sizeof(count_text),"%u Pokemon  Stamina %u",t->count,trainer_stamina_cost(&s_store,id));render_text(32,sy+20-y,count_text,GAME_UI_MUTED);}
   game_ui_list_marker(y,8,sy,top+row,count,selected);
  }
- if(s_route_hall)game_ui_text_centered(y,8,44,224,16,"短途切磋 随伙伴等级成长",GAME_UI_MUTED);
- if(!count)game_ui_text_centered(y,16,124,208,16,"赢得一次野战后开放",GAME_UI_MUTED);
+ if(s_route_hall)game_ui_text_centered(y,8,44,224,16,"Quick spar, scales with Lv",GAME_UI_MUTED);
+ if(!count)game_ui_text_centered(y,16,124,208,16,"Opens after a wild win",GAME_UI_MUTED);
  bool supply=!s_route_hall&&s_selected==TRAINER_COUNT&&s_store.league_active;
  unsigned cost=supply?0:trainer_stamina_cost(&s_store,s_selected);
  char balance[64],waiting[64];
  if(count){
-  snprintf(balance,sizeof(balance),"体能%u/100 消耗%u",nurture_stamina_points(&s_world.pet),cost);
+  snprintf(balance,sizeof(balance),"Stamina %u/100  Cost %u",nurture_stamina_points(&s_world.pet),cost);
   game_ui_text_centered(y,8,222,224,16,balance,GAME_UI_INK);
  }
  unsigned wait=nurture_wait_minutes(&s_world.pet,cost);
- snprintf(waiting,sizeof(waiting),"体能不足 约%u分钟后恢复",wait);
- const char *hint=s_hint[0]?s_hint:count&&wait?waiting:supply?"联盟补给 消耗牛奶":s_store.league_active?"本轮已扣体能 保留HP":s_selected==8&&!s_route_hall?"联盟整轮20 后续不再扣除":s_route_hall?(count==1?"两枚徽章解锁下一位":count==2?"五枚徽章解锁下一位":"胜利获得经验与补给"):trainer_unlocked(&s_store,s_selected)?"开始挑战时扣除体能":"先赢上一关或野战";
+ snprintf(waiting,sizeof(waiting),"Low stamina. ~%u min to wait",wait);
+ const char *hint=s_hint[0]?s_hint:count&&wait?waiting:supply?"League supply uses Milk":s_store.league_active?"Stamina paid. HP carries":s_selected==8&&!s_route_hall?"League run: 20 total":s_route_hall?(count==1?"2 badges unlock the next":count==2?"5 badges unlock the next":"Win for EXP and supplies"):trainer_unlocked(&s_store,s_selected)?"Stamina paid on start":"Win the last one or a wild fight";
  game_ui_text_centered(y,8,242,224,16,hint,GAME_UI_MUTED);
- if(!s_route_hall&&s_store.league_active){game_ui_text_centered(y,24,260,200,16,"联盟补给",GAME_UI_INK);game_ui_list_marker(y,0,260,count-1,count,selected);}
- else if(count)game_ui_text_centered(y,8,262,224,16,"熄屏待机约2小时回满",GAME_UI_MUTED);
+ if(!s_route_hall&&s_store.league_active){game_ui_text_centered(y,24,260,200,16,"League supply",GAME_UI_INK);game_ui_list_marker(y,0,260,count-1,count,selected);}
+ else if(count)game_ui_text_centered(y,8,262,224,16,"Idle: full in about 2 hours",GAME_UI_MUTED);
  game_ui_footer(y,game_ui_list_hint(count));
 }
 static uint16_t visible_hp(unsigned side){
@@ -134,11 +134,11 @@ static void faint_centered(int band,int x,int y,int w,int h,const uint8_t *data,
 static void battle_stage(int y){
  trainer_mon_t *p=mon(0),*e=mon(1);char text[128],label[48];
  name(e->species,label,sizeof(label));render_text(8,8-y,label,GAME_UI_INK);
- static const char *status_names[]={"","中毒","灼伤","麻痹","睡眠","冰冻"};
+ static const char *status_names[]={"","PSN","BRN","PAR","SLP","FRZ"};
  snprintf(text,sizeof(text),"Lv%u %s",e->level,status_names[e->status]);render_text(8,26-y,text,GAME_UI_MUTED);
  if(y<64&&y+SCREEN_BAND_H>48)battle_hud_draw_hp(rectangle,&y,8,48,4,2,BATTLE_HUD_WILD,visible_hp(1),e->max_hp,GAME_UI_BG);
  const trainer_info_t *t=battle_info();
- render_text(8,70-y,activity_playing()?"海渊守护者":t->name,GAME_UI_MUTED);
+ render_text(8,70-y,activity_playing()?"Deep Guardian":t->name,GAME_UI_MUTED);
  const trainer_side_t *opponent=&s_store.session.sides[1];
  const uint16_t balls_palette[4]={GAME_UI_INK,0x52aa,0xad55,GAME_UI_BG};
  for(unsigned i=0;i<6;i++) {
@@ -191,28 +191,28 @@ static void battle_stage(int y){
  if(y<240)return;
  battle_hud_draw_message_box(rectangle,&y,0,240,15,5,2,GAME_UI_BG);
  if(s_mode==EXP_GAIN){
-  snprintf(text,sizeof(text),"队伍获得经验 +%lu",(unsigned long)((uint64_t)s_result_exp*s_exp_frame/BATTLE_PRESENTATION_EXP_FRAMES));
+  snprintf(text,sizeof(text),"Party EXP +%lu",(unsigned long)((uint64_t)s_result_exp*s_exp_frame/BATTLE_PRESENTATION_EXP_FRAMES));
   game_ui_text_fitted(y,16,256,208,text,GAME_UI_INK);
   name(p->species,label,sizeof(label));
   snprintf(text,sizeof(text),"%s +%lu",label,(unsigned long)(xp.total-s_exp_from));
   game_ui_text_fitted(y,16,274,208,text,GAME_UI_MUTED);
-  game_ui_text_centered(y,16,292,208,16,s_exp_frame<BATTLE_PRESENTATION_EXP_FRAMES?"经验正在增长":"经验已保存 C继续",GAME_UI_INK);
- }else if(s_failed){game_ui_text_fitted(y,16,256,208,"保存失败 按C重试",GAME_UI_INK);}
+  game_ui_text_centered(y,16,292,208,16,s_exp_frame<BATTLE_PRESENTATION_EXP_FRAMES?"EXP is growing":"EXP saved. C: next",GAME_UI_INK);
+ }else if(s_failed){game_ui_text_fitted(y,16,256,208,"Save failed. C: retry",GAME_UI_INK);}
  else if(s_mode==FIGHT){
   name(mon(s_event.side)->species,label,sizeof(label));
-  snprintf(text,sizeof(text),"%s%s",label,s_event.kind==TRAINER_STATUS?"无法行动":"使出");
+  snprintf(text,sizeof(text),"%s%s",label,s_event.kind==TRAINER_STATUS?"can't move":"used");
   game_ui_text_fitted(y,16,256,208,text,GAME_UI_INK);
   if(s_event.kind==TRAINER_STATUS)snprintf(text,sizeof(text),"%s",combat_feedback(&s_event.attack));
   else {
    move_t display;bool named=combat_move(s_event.attack.move_id,&display);
-   snprintf(text,sizeof(text),"%.*s%s",named?display.name_zh_len:s_event.attack.move_zh_len,named?display.name_zh:s_event.attack.move_zh?s_event.attack.move_zh:"",s_event.attack.charging?" 蓄力":s_event.attack.missed?" 未命中":"");
+   snprintf(text,sizeof(text),"%.*s%s",named?display.name_zh_len:s_event.attack.move_zh_len,named?display.name_zh:s_event.attack.move_zh?s_event.attack.move_zh:"",s_event.attack.charging?" charging":s_event.attack.missed?" missed":"");
   }
   game_ui_text_fitted(y,16,274,208,text,GAME_UI_MUTED);
-  game_ui_text_centered(y,16,292,208,16,s_pause?"本招结束后打开战术":s_clock.elapsed_ms<s_timing.feedback_start?"C战术 长按B认输":s_timing.faint_mask&&s_clock.elapsed_ms>=s_timing.faint_start?"失去战斗能力":s_rule_notice[0]?s_rule_notice:dungeon_playing()&&dungeon_feedback()?dungeon_feedback():combat_feedback(&s_event.attack)?combat_feedback(&s_event.attack):"C战术 长按B认输",GAME_UI_INK);
- }else game_ui_text_fitted(y,16,256,208,s_failed?"保存失败 按C重试":dungeon_playing()&&dungeon_feedback()?dungeon_feedback():"伙伴准备出战！",GAME_UI_INK);
+  game_ui_text_centered(y,16,292,208,16,s_pause?"Tactics open after this move":s_clock.elapsed_ms<s_timing.feedback_start?"C: tactics  Hold B: give up":s_timing.faint_mask&&s_clock.elapsed_ms>=s_timing.faint_start?"Fainted":s_rule_notice[0]?s_rule_notice:dungeon_playing()&&dungeon_feedback()?dungeon_feedback():combat_feedback(&s_event.attack)?combat_feedback(&s_event.attack):"C: tactics  Hold B: give up",GAME_UI_INK);
+ }else game_ui_text_fitted(y,16,256,208,s_failed?"Save failed. C: retry":dungeon_playing()&&dungeon_feedback()?dungeon_feedback():"Pokemon ready to fight!",GAME_UI_INK);
 }
 static void choice(int y){
- char text[64];game_ui_title(y,s_mode==RECOVER?"牛奶回复":"选择伙伴",s_forced?"需要替补":s_mode==RECOVER?(s_between?"连战休息":"回复占一回合"):"换人占一回合");
+ char text[64];game_ui_title(y,s_mode==RECOVER?"Milk heal":"Pick a Pokemon",s_forced?"Need a backup":s_mode==RECOVER?(s_between?"Rest between fights":"Healing takes a turn"):"Swapping takes a turn");
  trainer_side_t *side=&s_store.session.sides[0];
  for(unsigned i=0;i<side->count;i++){
   char label[48];name(side->mons[i].species,label,sizeof(label));int sy=46+i*34;
@@ -221,53 +221,53 @@ static void choice(int y){
   snprintf(text,sizeof(text),"HP %u/%u",side->mons[i].hp,side->mons[i].max_hp);render_text(28,sy+16-y,text,GAME_UI_MUTED);
   game_ui_list_marker(y,8,sy,i,s_store.session.sides[0].count,s_slot);
  }
- game_ui_text_centered(y,8,254,224,16,s_hint[0]?s_hint:s_mode==RECOVER?"回复一半HP 至少50":"倒下的伙伴无法出场",GAME_UI_MUTED);
+ game_ui_text_centered(y,8,254,224,16,s_hint[0]?s_hint:s_mode==RECOVER?"Heals half HP (min 50)":"Fainted can't fight",GAME_UI_MUTED);
  game_ui_footer(y,game_ui_list_hint(s_store.session.sides[0].count));
 }
 static void draw_range(int first,int last){
  for(int y=first;y<last;y+=SCREEN_BAND_H){screen_band_clear(GAME_UI_BG);
   if(s_mode==HALL)hall(y);
   else if(s_mode==INTRO){
-   const trainer_info_t *t=battle_info();game_ui_title(y,activity_playing()?"漩涡远征":t->name,activity_playing()?"海渊守护者":t->badge);
+   const trainer_info_t *t=battle_info();game_ui_title(y,activity_playing()?"Whirl Expedition":t->name,activity_playing()?"Deep Guardian":t->badge);
    portrait(y,s_store.session.trainer,120+(18-s_frame)*4,48,2);
    const uint16_t pal[4]={0,0x6b4d,0xdedb,0xffff};render_sprite_2bpp(8-(18-s_frame)*4,150-y,trainer_player_art(),48,2,pal);
-   game_ui_footer(y,activity_playing()?"守护者邀你一战！":"训练家前来挑战！");
+   game_ui_footer(y,activity_playing()?"The guardian challenges you!":"A trainer challenges you!");
   }else if(s_mode==SWITCH||s_mode==RECOVER)choice(y);
   else if(s_mode==MOVES){
    trainer_mon_t *p=mon(0);game_ui_moves(y,p->transform_species?p->transform_species:p->species,p->transform_species?p->transform_level:p->level,s_slot,true);
   }else if(s_mode==RESULT){
-   const trainer_info_t *t=battle_info();game_ui_title(y,s_store.session.won?"挑战胜利":"挑战结束",t->name);
+   const trainer_info_t *t=battle_info();game_ui_title(y,s_store.session.won?"Challenge won":"Challenge over",t->name);
    if(s_store.session.won&&s_result_stage==2&&trainer_badge_art(s_store.session.trainer)){
     const uint16_t badge_pal[4]={0,0x52aa,0xad55,0xffff};
     render_sprite_2bpp(88,64-y,trainer_badge_art(s_store.session.trainer),16,4,badge_pal);
    }else portrait(y,s_store.session.trainer,64,42,2);
    if(s_failed){
-    game_ui_text_centered(y,8,200,224,16,"保存失败 按C重试",GAME_UI_INK);
+    game_ui_text_centered(y,8,200,224,16,"Save failed. C: retry",GAME_UI_INK);
    }else if(s_store.session.won && s_result_stage==0){
     game_ui_box(y,8,168,224,100);
     game_ui_text_centered(y,16,182,208,16,trainer_victory_line(s_store.session.trainer),GAME_UI_INK);
-    game_ui_text_centered(y,16,212,208,16,"这是你与伙伴努力的证明。",GAME_UI_INK);
-    game_ui_text_centered(y,16,242,208,16,"收下奖励，继续前进吧！",GAME_UI_INK);
+    game_ui_text_centered(y,16,212,208,16,"Proof of your hard work.",GAME_UI_INK);
+    game_ui_text_centered(y,16,242,208,16,"Take the reward and press on!",GAME_UI_INK);
    }else if(s_store.session.won && s_result_stage==1){
     unsigned row=0;char b[64];
     for(unsigned i=0;i<ITEM_COUNT&&row<5;i++)if(s_result_items.quantity[i]){
      snprintf(b,sizeof(b),"%s ×%u",items_info(i)->name,s_result_items.quantity[i]);
      game_ui_text_centered(y,8,158+row++*22,224,16,b,GAME_UI_INK);
     }
-    if(!row)game_ui_text_centered(y,8,194,224,16,"背包已满，奖励无法放入",GAME_UI_MUTED);
+    if(!row)game_ui_text_centered(y,8,194,224,16,"Bag full. Reward won't fit",GAME_UI_MUTED);
    }else{
-    game_ui_text_centered(y,8,174,224,16,s_store.session.won?t->badge:s_store.session.retired?"已经认输":"去照料伙伴再来",GAME_UI_INK);
-    char b[48];snprintf(b,sizeof(b),"获得经验 %lu",(unsigned long)s_result_exp);
-    game_ui_text_centered(y,8,200,224,16,s_store.session.retired?"不扣经验 不降等级":b,GAME_UI_MUTED);
-    game_ui_text_centered(y,8,226,224,16,s_new_chapter?"解锁新探索章节":"继续下一段旅程",GAME_UI_INK);
+    game_ui_text_centered(y,8,174,224,16,s_store.session.won?t->badge:s_store.session.retired?"You gave up":"Care for them, then return",GAME_UI_INK);
+    char b[48];snprintf(b,sizeof(b),"EXP +%lu",(unsigned long)s_result_exp);
+    game_ui_text_centered(y,8,200,224,16,s_store.session.retired?"No EXP or level loss":b,GAME_UI_MUTED);
+    game_ui_text_centered(y,8,226,224,16,s_new_chapter?"New exploration unlocked":"On to the next leg",GAME_UI_INK);
    }
-   if(!s_failed&&(!s_store.session.won||s_result_stage==2))game_ui_text_centered(y,8,254,224,16,"经验与奖励已保存",GAME_UI_MUTED);
-   game_ui_footer(y,s_store.session.won&&s_result_stage<2?"[C]继续":trainer_is_johto(s_store.session.trainer)?"[C]返回城都":s_route_hall?"[C]返回训练家":"[C]返回挑战大厅");
-   }else if(s_mode==CHAPTER_LINE){game_ui_title(y,"空木的最终考验","");portrait(y,TRAINER_JOHTO_FIRST+8,64,44,2);game_ui_box(y,8,166,224,108);game_ui_text_fitted(y,16,186,208,s_store.session.sides[1].active==4?"海天试炼：双属性破防。":"雷雨联防：保留克制伙伴。",GAME_UI_INK);game_ui_text_fitted(y,16,222,208,"一路相遇的伙伴也在等待。",GAME_UI_INK);game_ui_footer(y,"[C]继续交锋");
-   }else if(s_mode==CONFIRM){game_ui_title(y,"结束挑战","");game_ui_text_centered(y,8,112,224,16,s_failed?"保存失败 按C重试":"确定认输吗？",GAME_UI_INK);game_ui_text_centered(y,8,144,224,16,s_route_hall?"本次切磋不会获得经验":s_store.league_active?"联盟连战将重新开始":"本次挑战不会获得经验",GAME_UI_MUTED);game_ui_text_centered(y,8,176,224,16,activity_playing()?"中继已带回收益保留":dungeon_playing()?"已获经验道具都会保留":"入场体能不退还",GAME_UI_MUTED);static const char *const actions[]={"继续", "认输"};game_ui_actions(y,actions,2,s_retire_confirm);}
+   if(!s_failed&&(!s_store.session.won||s_result_stage==2))game_ui_text_centered(y,8,254,224,16,"EXP and rewards saved",GAME_UI_MUTED);
+   game_ui_footer(y,s_store.session.won&&s_result_stage<2?"[C] Continue":trainer_is_johto(s_store.session.trainer)?"[C] Back to Johto":s_route_hall?"[C] Back to trainers":"[C] Back to lobby");
+   }else if(s_mode==CHAPTER_LINE){game_ui_title(y,"Elm's Final Trial","");portrait(y,TRAINER_JOHTO_FIRST+8,64,44,2);game_ui_box(y,8,166,224,108);game_ui_text_fitted(y,16,186,208,s_store.session.sides[1].active==4?"Sea-sky trial: dual types.":"Storm guard: keep counters.",GAME_UI_INK);game_ui_text_fitted(y,16,222,208,"Friends you met are waiting.",GAME_UI_INK);game_ui_footer(y,"[C] Keep fighting");
+   }else if(s_mode==CONFIRM){game_ui_title(y,"End challenge","");game_ui_text_centered(y,8,112,224,16,s_failed?"Save failed. C: retry":"Give up?",GAME_UI_INK);game_ui_text_centered(y,8,144,224,16,s_route_hall?"No EXP for this spar":s_store.league_active?"League run restarts":"No EXP for this run",GAME_UI_MUTED);game_ui_text_centered(y,8,176,224,16,activity_playing()?"Banked gains are kept":dungeon_playing()?"EXP and items are kept":"Entry stamina not refunded",GAME_UI_MUTED);static const char *const actions[]={"Continue", "Give up"};game_ui_actions(y,actions,2,s_retire_confirm);}
   else if(s_mode==TACTICS){
-   game_ui_title(y,"战术",s_endgame.battle.kind?gym_rules_name(s_endgame.battle.kind):"");static const char *options[]={"继续交锋","查看技能","更换伙伴","牛奶回复","认输"};
-   for(unsigned i=0;i<5;i++){render_text(48,56+i*36-y,(dungeon_playing()||activity_playing())&&i==3?"仅营地可回复":options[i],GAME_UI_INK);
+   game_ui_title(y,"Tactics",s_endgame.battle.kind?gym_rules_name(s_endgame.battle.kind):"");static const char *options[]={"Keep fighting","View moves","Swap Pokemon","Milk heal","Give up"};
+   for(unsigned i=0;i<5;i++){render_text(48,56+i*36-y,(dungeon_playing()||activity_playing())&&i==3?"Heal at camps only":options[i],GAME_UI_INK);
  if(s_menu==i)game_ui_cursor(y,24,60+i*36);}
    if(s_endgame.battle.kind)game_ui_text_fitted(y,8,246,224,gym_rules_hint(s_endgame.battle.kind),GAME_UI_MUTED);
    game_ui_footer(y,GAME_UI_NAV_HINT);
@@ -307,12 +307,12 @@ static void sendout(uint8_t mask){
 static void rule_notice(const gym_rules_t *before){
  s_rule_notice[0]=0;const gym_rules_t *g=&s_endgame.battle;if(!g->kind)return;
  unsigned slot=s_store.session.sides[1].active;const gym_member_t *a=&before->member[slot],*b=&g->member[slot];
- if(g->kind==GYM_WIND&&g->pause_until>before->pause_until)snprintf(s_rule_notice,sizeof(s_rule_notice),"风场被压制 三回合窗口");
- else if(g->stacks!=before->stacks)snprintf(s_rule_notice,sizeof(s_rule_notice),"%s %u层",g->kind==GYM_SWARM?"虫巢":"寒潮",g->stacks);
- else if(!a->broken&&b->broken)snprintf(s_rule_notice,sizeof(s_rule_notice),"机制已破解 抓住机会！");
- else if(g->kind==GYM_CHEER&&!a->once&&b->once)snprintf(s_rule_notice,sizeof(s_rule_notice),"%s",mon(1)->status==1||mon(1)->status==2?"异常阻止了应援恢复":"应援恢复了体力！");
- else if(g->kind==GYM_LAKE&&!a->once&&b->once)snprintf(s_rule_notice,sizeof(s_rule_notice),"怒涛将至 可换抗水伙伴");
- else if((g->kind==GYM_FIST||g->kind==GYM_ELM)&&g->round==b->until&&!b->broken&&!b->once)snprintf(s_rule_notice,sizeof(s_rule_notice),"蓄势完成 注意下一次攻击");
+ if(g->kind==GYM_WIND&&g->pause_until>before->pause_until)snprintf(s_rule_notice,sizeof(s_rule_notice),"Wind pinned: 3-turn window");
+ else if(g->stacks!=before->stacks)snprintf(s_rule_notice,sizeof(s_rule_notice),"%s Floor %u",g->kind==GYM_SWARM?"Bug Nest":"Cold Wave",g->stacks);
+ else if(!a->broken&&b->broken)snprintf(s_rule_notice,sizeof(s_rule_notice),"Mechanic broken! Strike!");
+ else if(g->kind==GYM_CHEER&&!a->once&&b->once)snprintf(s_rule_notice,sizeof(s_rule_notice),"%s",mon(1)->status==1||mon(1)->status==2?"Status blocked the cheer heal":"Cheer restored HP!");
+ else if(g->kind==GYM_LAKE&&!a->once&&b->once)snprintf(s_rule_notice,sizeof(s_rule_notice),"Big wave coming. Swap to a Water-resist");
+ else if((g->kind==GYM_FIST||g->kind==GYM_ELM)&&g->round==b->until&&!b->broken&&!b->once)snprintf(s_rule_notice,sizeof(s_rule_notice),"Charged! Watch the next hit");
 }
 static void next_action(void){
  if(s_quit){s_quit=false;{set_mode(CONFIRM);s_retire_confirm=false;}draw_all();return;}
@@ -421,13 +421,13 @@ void play_trainer_key(bsp_btn_t b,bsp_btn_ev_t e){
    if(!s_route_hall&&s_selected==TRAINER_COUNT&&s_store.league_active){set_mode(RECOVER);s_between=true;s_forced=false;s_slot=0;s_hint[0]=0;draw_all();return;}
    world_challenge_result_t status=world_challenge_start(s_selected);refresh();
    if(status==WORLD_CHALLENGE_OK){set_mode(INTRO);s_frame=0;music_director_play(MUSIC_ENCOUNTER);}
-   else if(status!=WORLD_CHALLENGE_NO_STAMINA)snprintf(s_hint,sizeof(s_hint),"%s",status==WORLD_CHALLENGE_SAVE_FAILED?"保存失败 体能未扣除":status==WORLD_CHALLENGE_BUSY?"请先完成当前对战":status==WORLD_CHALLENGE_LOCKED?"挑战尚未解锁":"存档暂不可用");
+   else if(status!=WORLD_CHALLENGE_NO_STAMINA)snprintf(s_hint,sizeof(s_hint),"%s",status==WORLD_CHALLENGE_SAVE_FAILED?"Save failed. No stamina spent":status==WORLD_CHALLENGE_BUSY?"Finish the current battle":status==WORLD_CHALLENGE_LOCKED?"Challenge locked":"Save unavailable");
   }
  }else if(s_mode==CHAPTER_LINE){if(confirm){sendout(2);return;}
- }else if(s_mode==RESULT){if(confirm||back){if(s_failed){result();return;}if(s_store.session.won&&s_result_stage<2){s_result_stage++;set_mode(RESULT);s_frame=0;draw_all();return;}if(!world_challenge_settle()){s_failed=true;}else{if(s_store.session.trainer>=TRAINER_LAKE_GUARD){play_story_open_lake();return;}if(trainer_is_johto(s_store.session.trainer)){nav_back(PAGE_JOHTO);return;}refresh();if(s_new_chapter)snprintf(s_hint,sizeof(s_hint),"新章节见冒险笔记");else s_hint[0]=0;s_failed=false;set_mode(HALL);s_selected=s_store.league_active?s_store.league_stage:s_selected;music_director_play(s_route_hall?MUSIC_ROUTE:MUSIC_GYM);}}}
+ }else if(s_mode==RESULT){if(confirm||back){if(s_failed){result();return;}if(s_store.session.won&&s_result_stage<2){s_result_stage++;set_mode(RESULT);s_frame=0;draw_all();return;}if(!world_challenge_settle()){s_failed=true;}else{if(s_store.session.trainer>=TRAINER_LAKE_GUARD){play_story_open_lake();return;}if(trainer_is_johto(s_store.session.trainer)){nav_back(PAGE_JOHTO);return;}refresh();if(s_new_chapter)snprintf(s_hint,sizeof(s_hint),"New chapter in Notes");else s_hint[0]=0;s_failed=false;set_mode(HALL);s_selected=s_store.league_active?s_store.league_stage:s_selected;music_director_play(s_route_hall?MUSIC_ROUTE:MUSIC_GYM);}}}
  else if(s_mode==CONFIRM){
   if(direction)s_retire_confirm=!s_retire_confirm;
-  if(confirm&&s_retire_confirm){if(activity_playing()?activity_battle_retire():dungeon_playing()?dungeon_retire():world_challenge_retire()){result();return;}else{s_failed=true;snprintf(s_hint,sizeof(s_hint),"保存失败 请重试");}}
+  if(confirm&&s_retire_confirm){if(activity_playing()?activity_battle_retire():dungeon_playing()?dungeon_retire():world_challenge_retire()){result();return;}else{s_failed=true;snprintf(s_hint,sizeof(s_hint),"Save failed. Retry");}}
   else if(confirm||back){set_mode(TACTICS);s_menu=0;s_failed=false;}
  }else if(s_mode==TACTICS){
   if(direction)s_menu=(s_menu+5+direction)%5;
@@ -450,7 +450,7 @@ void play_trainer_key(bsp_btn_t b,bsp_btn_ev_t e){
    s_slot=nav_list_selection(b,e,count,s_slot);
    if(!nav_list_activate(b,e,count)){draw_all();return;}
    bool ok=activity_playing()?(s_mode==SWITCH&&activity_battle_switch(s_slot,s_forced)):dungeon_playing()?(s_mode==SWITCH&&dungeon_switch(s_slot,s_forced)):(s_mode==RECOVER?world_challenge_recover(s_slot):world_challenge_switch(s_slot,s_forced));
-   if(ok){refresh();s_forced=false;if(s_between){snprintf(s_hint,sizeof(s_hint),"回复完成");draw_all();}else if(s_mode==RECOVER){next_action();}else sendout(1);return;}else snprintf(s_hint,sizeof(s_hint),"无法使用 或保存失败");
+   if(ok){refresh();s_forced=false;if(s_between){snprintf(s_hint,sizeof(s_hint),"Healed");draw_all();}else if(s_mode==RECOVER){next_action();}else sendout(1);return;}else snprintf(s_hint,sizeof(s_hint),"Can't use, or save failed");
   }
  }else if(s_failed&&confirm){s_failed=false;next_action();return;}
  else if(back)s_quit=true;

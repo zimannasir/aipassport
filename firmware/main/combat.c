@@ -6,6 +6,7 @@
 #include "combat_gen2_stats.h"
 #include "combat_johto.h"
 #include "pokemon_names.h"
+#include "english_names.h"
 #include <stddef.h>
 #include "combat_selected_moves.h"
 static const combat_move_data_t *move_data(unsigned id){
@@ -60,6 +61,7 @@ bool combat_move(uint16_t id,move_t *out){
  *out=data->move;
  uint8_t length=0;const char *name=pokemon_move_names_override(id,&length);
  if(name){out->name_zh=name;out->name_zh_len=length;}
+ {uint8_t en_length=0;const char *en_name=english_move_name(id,&en_length);if(en_name){out->name_zh=en_name;out->name_zh_len=en_length;}}
  return true;
 }
 uint8_t combat_learn_level(uint16_t species,uint16_t move){
@@ -390,62 +392,62 @@ void combat_turn_context(combat_mon_t *a,combat_mon_t *d,uint16_t ability,uint32
 }
 
 const char *combat_description(uint16_t id){
- if(!move_data(id))return "未知招式";
+ if(!move_data(id))return "Unknown move";
  switch(move_data(id)->effect){
- case EFFECT_FLAME_WHEEL:return "解除自身冰冻 可能灼伤";
- case EFFECT_ATTACK_DOWN_2:return "大幅降低对手攻击";
- case EFFECT_ACCURACY_DOWN_HIT:return "攻击并降低对手命中";
- case EFFECT_DEFENSE_UP_HIT:return "攻击时可能提升自身防御";
- case EFFECT_ALL_UP_HIT:return "可能提升五项战斗能力";
- case EFFECT_FALSE_SWIPE:return "至少给对手保留一点体力";
- case EFFECT_TWISTER:return "可能畏缩 对飞翔伤害翻倍";
- case EFFECT_SLEEP:return "使对手睡眠";case EFFECT_PARALYZE:case EFFECT_PARALYZE_HIT:case EFFECT_THUNDER:return "可能使对手麻痹";
- case EFFECT_POISON:case EFFECT_POISON_HIT:case EFFECT_POISON_MULTI_HIT:return "可能使对手中毒";case EFFECT_TOXIC:return "剧毒伤害逐次增加";
- case EFFECT_BURN_HIT:return "可能灼伤 降低物攻";case EFFECT_FREEZE_HIT:return "可能使对手冰冻";
- case EFFECT_CONFUSE:case EFFECT_CONFUSE_HIT:return "使对手混乱 可能自伤";
- case EFFECT_LEECH_SEED:return "每回合吸取对手体力";
- case EFFECT_LEECH_HIT:case EFFECT_DREAM_EATER:return id==138?"睡眠时吸取对手体力":"恢复实际伤害的一半";
- case EFFECT_HEAL:return id==156?"完全回复 并睡眠两回合":"恢复一半最大体力";
- case EFFECT_MULTI_HIT:return "连续攻击二至五次";case EFFECT_DOUBLE_HIT:return "连续攻击两次";
- case EFFECT_RECOIL_HIT:return "强力攻击 自身受反伤";case EFFECT_SELFDESTRUCT:return "大爆发后自身倒下";
- case EFFECT_FLY:case EFFECT_SOLARBEAM:case EFFECT_SKY_ATTACK:case EFFECT_SKULL_BASH:case EFFECT_RAZOR_WIND:return "蓄力一回合后攻击";
- case EFFECT_HYPER_BEAM:return "强力攻击后休息一回合";
- case EFFECT_STATIC_DAMAGE:case EFFECT_LEVEL_DAMAGE:case EFFECT_PSYWAVE:return "固定伤害 无视攻防";case EFFECT_SUPER_FANG:return "削减对手当前一半体力";
- case EFFECT_OHKO:return "等级不低时概率一击倒下";
- case EFFECT_COUNTER:return "双倍返还受到的物理伤害";case EFFECT_BIDE:return "忍耐后返还累计伤害";
- case EFFECT_ATTACK_UP:case EFFECT_ATTACK_UP_2:return "提升自身攻击";case EFFECT_DEFENSE_UP:case EFFECT_DEFENSE_UP_2:case EFFECT_DEFENSE_CURL:return "提升自身防御";
- case EFFECT_SP_ATK_UP:return "提升自身特攻";case EFFECT_SP_DEF_UP_2:return "大幅提升自身特防";case EFFECT_SPEED_UP_2:return "提升速度 改变出手顺序";
- case EFFECT_DEFENSE_DOWN:case EFFECT_DEFENSE_DOWN_2:case EFFECT_DEFENSE_DOWN_HIT:return "降低对手防御";
- case EFFECT_ATTACK_DOWN:case EFFECT_ATTACK_DOWN_HIT:return "降低对手攻击";
- case EFFECT_SPEED_DOWN:case EFFECT_SPEED_DOWN_HIT:return "降低对手速度";case EFFECT_SP_DEF_DOWN_HIT:return "可能降低对手特防";
- case EFFECT_ACCURACY_DOWN:return "降低对手命中";case EFFECT_EVASION_UP:return "提高自身闪避";
- case EFFECT_REFLECT:return "暂时减半物理伤害";case EFFECT_LIGHT_SCREEN:return "暂时减半特殊伤害";
- case EFFECT_MIST:return "防止能力被对手降低";case EFFECT_RESET_STATS:return "清除双方能力变化";case EFFECT_FOCUS_ENERGY:return "提高击中要害概率";
- case EFFECT_SUBSTITUTE:return "消耗体力制造替身";case EFFECT_TRANSFORM:return "复制对方形态与技能";
- case EFFECT_DISABLE:return "暂时封住对手上一招";
- case EFFECT_METRONOME:return "随机使出一种招式";case EFFECT_MIMIC:return "学会对手上一招直到换人";case EFFECT_MIRROR_MOVE:return "使用对手上一招";
- case EFFECT_CONVERSION:return "变为已学技能的属性";
- case EFFECT_TRAP_TARGET:return "束缚对手 持续造成伤害";
- case EFFECT_FLINCH_HIT:case EFFECT_STOMP:return "先手命中可能使对手畏缩";
- case EFFECT_RAMPAGE:return "连续攻击后陷入混乱";
- case EFFECT_RAGE:return "受到攻击时提升物攻";
- case EFFECT_ALWAYS_HIT:return "忽略命中与闪避变化";
- case EFFECT_FORCE_SWITCH:case EFFECT_TELEPORT:return "此对战模式不自动使用";
- case EFFECT_SPLASH:return "只是跳跃 不产生伤害";
- default:return "依据属性与攻防造成伤害";
+ case EFFECT_FLAME_WHEEL:return "Thaws you. May burn";
+ case EFFECT_ATTACK_DOWN_2:return "Sharply lowers foe Attack";
+ case EFFECT_ACCURACY_DOWN_HIT:return "Hits, lowers foe accuracy";
+ case EFFECT_DEFENSE_UP_HIT:return "May raise own Defense";
+ case EFFECT_ALL_UP_HIT:return "May raise all stats";
+ case EFFECT_FALSE_SWIPE:return "Leaves foe at 1 HP";
+ case EFFECT_TWISTER:return "May flinch. x2 vs Fly";
+ case EFFECT_SLEEP:return "Puts foe to sleep";case EFFECT_PARALYZE:case EFFECT_PARALYZE_HIT:case EFFECT_THUNDER:return "May paralyze foe";
+ case EFFECT_POISON:case EFFECT_POISON_HIT:case EFFECT_POISON_MULTI_HIT:return "May poison foe";case EFFECT_TOXIC:return "Toxic damage grows";
+ case EFFECT_BURN_HIT:return "May burn, lowers Attack";case EFFECT_FREEZE_HIT:return "May freeze foe";
+ case EFFECT_CONFUSE:case EFFECT_CONFUSE_HIT:return "Confuses foe";
+ case EFFECT_LEECH_SEED:return "Drains foe HP each turn";
+ case EFFECT_LEECH_HIT:case EFFECT_DREAM_EATER:return id==138?"Drains HP of a sleeper":"Heals half the damage dealt";
+ case EFFECT_HEAL:return id==156?"Full heal, sleep 2 turns":"Heals half max HP";
+ case EFFECT_MULTI_HIT:return "Hits 2-5 times";case EFFECT_DOUBLE_HIT:return "Hits twice";
+ case EFFECT_RECOIL_HIT:return "Strong hit with recoil";case EFFECT_SELFDESTRUCT:return "Faints after blasting";
+ case EFFECT_FLY:case EFFECT_SOLARBEAM:case EFFECT_SKY_ATTACK:case EFFECT_SKULL_BASH:case EFFECT_RAZOR_WIND:return "Charges, then strikes";
+ case EFFECT_HYPER_BEAM:return "Strong hit, rest next turn";
+ case EFFECT_STATIC_DAMAGE:case EFFECT_LEVEL_DAMAGE:case EFFECT_PSYWAVE:return "Fixed damage";case EFFECT_SUPER_FANG:return "Halves foe's current HP";
+ case EFFECT_OHKO:return "One-hit KO if level is high";
+ case EFFECT_COUNTER:return "Returns 2x physical damage";case EFFECT_BIDE:return "Endures, returns damage";
+ case EFFECT_ATTACK_UP:case EFFECT_ATTACK_UP_2:return "Raises own Attack";case EFFECT_DEFENSE_UP:case EFFECT_DEFENSE_UP_2:case EFFECT_DEFENSE_CURL:return "Raises own Defense";
+ case EFFECT_SP_ATK_UP:return "Raises own Sp.Atk";case EFFECT_SP_DEF_UP_2:return "Sharply raises Sp.Def";case EFFECT_SPEED_UP_2:return "Raises Speed";
+ case EFFECT_DEFENSE_DOWN:case EFFECT_DEFENSE_DOWN_2:case EFFECT_DEFENSE_DOWN_HIT:return "Lowers foe Defense";
+ case EFFECT_ATTACK_DOWN:case EFFECT_ATTACK_DOWN_HIT:return "Lowers foe Attack";
+ case EFFECT_SPEED_DOWN:case EFFECT_SPEED_DOWN_HIT:return "Lowers foe Speed";case EFFECT_SP_DEF_DOWN_HIT:return "May lower foe Sp.Def";
+ case EFFECT_ACCURACY_DOWN:return "Lowers foe accuracy";case EFFECT_EVASION_UP:return "Raises own evasion";
+ case EFFECT_REFLECT:return "Halves physical damage";case EFFECT_LIGHT_SCREEN:return "Halves special damage";
+ case EFFECT_MIST:return "Blocks stat drops";case EFFECT_RESET_STATS:return "Resets all stat changes";case EFFECT_FOCUS_ENERGY:return "Raises crit chance";
+ case EFFECT_SUBSTITUTE:return "Makes a decoy with HP";case EFFECT_TRANSFORM:return "Copies foe form and moves";
+ case EFFECT_DISABLE:return "Seals foe's last move";
+ case EFFECT_METRONOME:return "Uses a random move";case EFFECT_MIMIC:return "Learns foe's last move";case EFFECT_MIRROR_MOVE:return "Uses foe's last move";
+ case EFFECT_CONVERSION:return "Changes to a known move's type";
+ case EFFECT_TRAP_TARGET:return "Traps foe, repeated damage";
+ case EFFECT_FLINCH_HIT:case EFFECT_STOMP:return "Quick hit may flinch foe";
+ case EFFECT_RAMPAGE:return "Confuses user after hitting";
+ case EFFECT_RAGE:return "Raises Attack when hit";
+ case EFFECT_ALWAYS_HIT:return "Ignores accuracy/evasion";
+ case EFFECT_FORCE_SWITCH:case EFFECT_TELEPORT:return "Not used in auto-battle";
+ case EFFECT_SPLASH:return "Just jumps. No damage";
+ default:return "Damage by type and stats";
  }
 }
 const char *combat_feedback(const struct battle_round *r){
- if(r->fatigue)return r->fatigue==1?"陷入苦战 体力开始消耗":"苦战加剧 回复效果降低";
- if(r->skipped){static const char *messages[]={"","正在睡眠","身体被冻住了","麻痹 无法行动","畏缩 无法行动","混乱中伤到了自己","正在恢复行动"};return r->skipped<=6?messages[r->skipped]:"无法行动";}
- if(r->charging)return "正在积蓄力量";
- if(r->missed)return "攻击没有命中";
- if(r->no_effect||!r->mult)return "没有产生效果";
- if(r->healed)return "体力得到回复";
- if(r->self_target)return "自身状态发生变化";
- if(r->hits>1)return "连续攻击命中";
- if(!r->damage)return "对手状态发生变化";
- return r->critical?"击中了要害！":battle_eff_label(r->mult);
+ if(r->fatigue)return r->fatigue==1?"Struggle: HP starts to drain":"Struggle: healing weakened";
+ if(r->skipped){static const char *messages[]={"","is asleep","is frozen solid","is paralyzed","flinched","hurt itself in confusion","is moving again"};return r->skipped<=6?messages[r->skipped]:"can't move";}
+ if(r->charging)return "is storing power";
+ if(r->missed)return "attack missed";
+ if(r->no_effect||!r->mult)return "had no effect";
+ if(r->healed)return "HP restored";
+ if(r->self_target)return "stats changed";
+ if(r->hits>1)return "multi-hit landed";
+ if(!r->damage)return "foe's stats changed";
+ return r->critical?"A critical hit!":battle_eff_label(r->mult);
 }
 
 int combat_priority(uint16_t move){return move==98||move==183||move==245?1:move==68||move==243?-1:0;}

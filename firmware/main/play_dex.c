@@ -68,7 +68,7 @@ static void draw_band(int band_y)
 
     // 标题 + 计数
     snprintf(buf, sizeof(buf), "%u/%u", dex_count_caught(d), DEX_SPECIES);
-    game_ui_title(band_y, "图鉴", buf);
+    game_ui_title(band_y, "Pokedex", buf);
 
     if(s_detail){
         exploration_view_t view;world_exploration_snapshot(&view);
@@ -79,13 +79,13 @@ static void draw_band(int band_y)
             uint8_t size;const uint8_t *art=assets_front_sprite(s_species,&size);uint16_t pal[4];assets_palette_variant(sp.palette,false,pal);
             if(art)game_ui_sprite_centered(band_y,8,64,224,112,art,size,size,2,pal);
         }
-        snprintf(buf,sizeof(buf),"%s  %u星",route>=0?exploration_route(route)->name:"未知",rarity);
+        snprintf(buf,sizeof(buf),"%s  %u★",route>=0?exploration_route(route)->name:"Unknown",rarity);
         game_ui_text_centered(band_y,8,184,224,16,buf,GAME_UI_INK);
         unsigned chapter=exploration_unlock_chapter(s_species);bool open=exploration_species_open(s_species,view.defeated);
-        game_ui_text_centered(band_y,8,208,224,16,open?"已开放：可追踪获取":exploration_chapter(chapter)->condition,GAME_UI_MUTED);
-        game_ui_text_centered(band_y,8,232,224,16,s_feedback?s_feedback:dex_is_caught(d,s_species)?"已捕获 仍可追踪闪光":"未捕获 追踪可确保遇到",GAME_UI_MUTED);
-        game_ui_text_centered(band_y,8,256,224,16,"上下切换 长按B返回",GAME_UI_MUTED);
-        game_ui_footer(band_y,view.state.tracked_species==s_species?"上下切换 确认取消追踪":"上下切换 确认追踪");
+        game_ui_text_centered(band_y,8,208,224,16,open?"Open: can be tracked":exploration_chapter(chapter)->condition,GAME_UI_MUTED);
+        game_ui_text_centered(band_y,8,232,224,16,s_feedback?s_feedback:dex_is_caught(d,s_species)?"Caught. Shiny trackable":"Not caught. Track to meet",GAME_UI_MUTED);
+        game_ui_text_centered(band_y,8,256,224,16,"Up/Down  Hold B: back",GAME_UI_MUTED);
+        game_ui_footer(band_y,view.state.tracked_species==s_species?"Up/Down  C: stop tracking":"Up/Down  C: track");
         screen_push_band(band_y);return;
     }
     // Static grid: every page/selection update calls draw_all(). A thumbnail
@@ -129,7 +129,7 @@ static void draw_band(int band_y)
              (DEX_SPECIES + PER_PAGE - 1) / PER_PAGE);
     render_text(228 - render_text_width(buf), Y(PAGE_Y), buf, GAME_UI_MUTED);
 
-    game_ui_footer(band_y, "A上 B下 C详情 长按B返回");
+    game_ui_footer(band_y, "A Up B Dn C Info Hold B Back");
 
     #undef Y
     screen_push_band(band_y);
@@ -172,7 +172,7 @@ void play_dex_key(bsp_btn_t btn, bsp_btn_ev_t ev)
             exploration_view_t view;world_exploration_snapshot(&view);bool cancel=view.state.tracked_species==s_species;
             exploration_kind_t result=world_exploration_track(cancel?0:s_species);
             if(result==EXPLORE_NONE&&!cancel){nav_open(PAGE_EXPLORATION);return;}
-            s_feedback=result==EXPLORE_NONE?"已恢复章节目标":result==EXPLORE_BUSY?"请先结束当前对战":result==EXPLORE_BLOCKED?"尚未解锁该栖息地":"保存失败 请重试";
+            s_feedback=result==EXPLORE_NONE?"Chapter goal restored":result==EXPLORE_BUSY?"Finish current battle first":result==EXPLORE_BLOCKED?"Habitat not unlocked":"Save failed. Retry";
         }else return;
         draw_all();return;
     }

@@ -14,8 +14,8 @@
 #define GAME_UI_ACCENT C_FOCUS
 
 void game_ui_title(int band_y, const char *title, const char *right_text);
-#define GAME_UI_NAV_HINT "A上 B下 C确认 长按B返回"
-#define GAME_UI_BACK_HINT "长按B返回"
+#define GAME_UI_NAV_HINT "A Up B Dn C OK Hold B Back"
+#define GAME_UI_BACK_HINT "Hold B: back"
 void game_ui_footer(int band_y, const char *hint);
 void game_ui_action_row(int band_y, int x, int y, int width, const char *const *labels, unsigned count, unsigned selected);
 void game_ui_actions(int band_y, const char *const *labels, unsigned count, unsigned selected);

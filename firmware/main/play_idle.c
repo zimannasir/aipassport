@@ -122,7 +122,7 @@ static void draw_band(int band_y, int8_t breath)
                               Y(MOOD_Y + (TEXT_H - heart.h) / 2),
                               heart.data, heart.w, heart.h, 1, HEART_PAL);
     }
-    static const char *MOOD[4] = {"愉快", "平静", "低落", "消沉"};
+    static const char *MOOD[4] = {"Happy", "Calm", "Down", "Gloomy"};
     render_text(12, Y(MOOD_Y), MOOD[nurture_mood(&s_w.pet)], GAME_UI_MUTED);
 
     sprite_asset_t spr;
@@ -136,7 +136,7 @@ static void draw_band(int band_y, int8_t breath)
                                  spr.data, spr.w, spr.h, spr.w==56?1:SPRITE_SIZE / spr.w, pal);
     }
 
-    static const char *AXIS[3] = {"饱食", "心情", "体能"};
+    static const char *AXIS[3] = {"Full", "Mood", "Stamina"};
     const uint8_t value[3] = {
         nurture_pct(s_w.pet.satiety), nurture_pct(s_w.pet.mood),
         nurture_stamina_points(&s_w.pet),
@@ -150,17 +150,17 @@ static void draw_band(int band_y, int8_t breath)
     uint32_t got, need; exp_progress(s_w.exp, s_w.level, &got, &need);
     unsigned xp = s_w.level >= LEVEL_MAX ? 100 : (unsigned)((uint64_t)got * 100 / need);
     if (xp > 100) xp = 100;
-    render_text(12, Y(EXP_Y), "经验", GAME_UI_INK);
+    render_text(12, Y(EXP_Y), "EXP", GAME_UI_INK);
     game_ui_meter(band_y, AXIS_BAR_X, EXP_Y, 80, xp);
-    if (s_w.level >= LEVEL_MAX) snprintf(buf, sizeof(buf), "满级");
+    if (s_w.level >= LEVEL_MAX) snprintf(buf, sizeof(buf), "Max Lv");
     else snprintf(buf, sizeof(buf), "%u%%", xp);
     render_text(228-render_text_width(buf), Y(EXP_Y), buf, GAME_UI_INK);
     unsigned wait=nurture_wait_minutes(&s_w.pet,100);
-    if(!wait)snprintf(buf,sizeof(buf),"体能已满 可以去探索");
-    else snprintf(buf,sizeof(buf),"体能回满约%u分钟",wait);
+    if(!wait)snprintf(buf,sizeof(buf),"Stamina full. Go explore");
+    else snprintf(buf,sizeof(buf),"Full stamina in ~%u min",wait);
     game_ui_text_centered(band_y,12,PROGRESS_Y,216,16,buf,GAME_UI_MUTED);
 
-    static const char *const actions[] = {"照料", "菜单", "遭遇"};
+    static const char *const actions[] = {"Care", "Menu", "Wild"};
     game_ui_actions(band_y, actions, 3, s_action);
     #undef Y
     screen_push_band(band_y);
@@ -266,7 +266,7 @@ void play_idle_enter(void)
 
     ESP_LOGI(TAG, "P1：#%u Lv%u  提示行 %d px  横带 %dx%d×%d 条",
              s_w.species, s_w.level,
-             render_text_width("上下选择 确认执行"),
+             render_text_width("Up/Down: pick  C: OK"),
              SCR_W, BAND_H, SCR_H / BAND_H);
 }
 

@@ -41,7 +41,7 @@ static void background(int y,unsigned art){
   if(art==N_ART_JOURNEY){int x=52+(clock_state.elapsed_ms<1800?clock_state.elapsed_ms:1800)/30;rect(y,x,t+45,52,12,0x630c);rect(y,x+20,t+18,2,28,0x2108);rect(y,x+22,t+20,22,20,0xffff);}
  }else if(art==N_ART_TOWER||art==N_ART_RUINS){
   for(int i=0;i<3;i++){int x=36+i*64;rect(y,x,t+20,40,76,0x9c53);rect(y,x-4,t+16,48,6,0x630c);rect(y,x+14,t+66,12,30,0x2108);}
-  if(art==N_ART_RUINS)for(int i=0;i<3;i++)render_text(49+i*64,t+35-y,(const char*[]){"日","月","星"}[i],GAME_UI_INK);
+  if(art==N_ART_RUINS)for(int i=0;i<3;i++)render_text(49+i*64,t+35-y,(const char*[]){"Sun","Moon","Star"}[i],GAME_UI_INK);
  }else{
   for(int i=0;i<5;i++){int x=24+i*40;rect(y,x+12,t+62,8,38,0x9387);rect(y,x,t+24,32,48,0x4c49);rect(y,x+6,t+16,20,14,0x4c49);rect(y,x+4,t+30,20,4,0xaeea);}
  }
@@ -70,21 +70,21 @@ static void draw_range(int top,int bottom){
     game_ui_text_fitted(y,16,172,208,misses?script->hint:p->line[0],GAME_UI_INK);
     for(unsigned i=0;i<script->choices;i++){game_ui_text_fitted(y,38,200+i*24,182,script->choice[i],GAME_UI_INK);if(i==selected)game_ui_cursor(y,18,204+i*24);}
    }else{unsigned remaining=visible();for(unsigned i=0;i<3;i++){prefix(b,p->line[i],remaining);game_ui_text_fitted(y,16,180+i*28,208,b,GAME_UI_INK);unsigned n=chars(p->line[i]);remaining=remaining>n?remaining-n:0;}}
-   game_ui_footer(y,replay?"[C]继续 长按B结束回看":choosing()?GAME_UI_NAV_HINT:"[C]继续 长按B暂停");
+   game_ui_footer(y,replay?"[C] Next  Hold B: end review":choosing()?GAME_UI_NAV_HINT:"[C] Next  Hold B: pause");
    if(clock_state.elapsed_ms<300)game_ui_fade_background(y,16-clock_state.elapsed_ms*16/300);
   }else if(view==MEMORIES){
-   game_ui_title(y,"旅途回顾","只读");unsigned ids[N_SCENE_COUNT],n=memories(ids),toprow=selected>=6?selected-5:0;
+   game_ui_title(y,"Journey Review","Read-only");unsigned ids[N_SCENE_COUNT],n=memories(ids),toprow=selected>=6?selected-5:0;
    for(unsigned row=0;row<6&&toprow+row<n;row++){unsigned i=toprow+row;game_ui_text_fitted(y,34,48+row*34,190,narrative_script(ids[i])->title,GAME_UI_INK);if(i==selected)game_ui_cursor(y,14,52+row*34);}
-   if(!n)game_ui_text_centered(y,8,124,224,16,"新的旅程正等着你",GAME_UI_MUTED);
-   game_ui_text_centered(y,8,256,224,16,"回看不扣体能 不发奖励",GAME_UI_MUTED);game_ui_footer(y,GAME_UI_NAV_HINT);
+   if(!n)game_ui_text_centered(y,8,124,224,16,"A new journey awaits",GAME_UI_MUTED);
+   game_ui_text_centered(y,8,256,224,16,"Review costs nothing, no rewards",GAME_UI_MUTED);game_ui_footer(y,GAME_UI_NAV_HINT);
   }else{
-   narrative_goal_t g=narrative_goal(&context);game_ui_title(y,"当前调查","");game_ui_box(y,8,42,224,132);
+   narrative_goal_t g=narrative_goal(&context);game_ui_title(y,"Current survey","");game_ui_box(y,8,42,224,132);
    game_ui_text_fitted(y,20,54,200,g.title,GAME_UI_INK);game_ui_text_fitted(y,20,90,200,g.place,GAME_UI_ACCENT);game_ui_text_fitted(y,20,126,200,g.task,GAME_UI_INK);
-   if(g.action==N_GO_LEGEND)game_ui_text_fitted(y,20,150,200,context.state.legend?"已定位 再次接近不扣体能":"首次定位消耗10体能",GAME_UI_MUTED);
-   const char *choices[]={context.state.scene?"继续未完的对话":"继续调查","自由探索","回顾已读剧情"};
+   if(g.action==N_GO_LEGEND)game_ui_text_fitted(y,20,150,200,context.state.legend?"Located. Free to revisit":"First visit: 10 stamina",GAME_UI_MUTED);
+   const char *choices[]={context.state.scene?"Resume the talk":"Resume survey","Free exploration","Review past scenes"};
    for(unsigned i=0;i<3;i++){game_ui_text_fitted(y,40,190+i*28,180,choices[i],GAME_UI_INK);if(i==selected)game_ui_cursor(y,16,194+i*28);}game_ui_footer(y,GAME_UI_NAV_HINT);
   }
-  if(error&&error!=N_WRONG){game_ui_box(y,8,238,224,38);game_ui_text_fitted(y,16,248,208,error==N_BUSY?"先结束当前活动 再继续":error==N_SAVE_FAILED?"保存失败 按C重试":error==N_NO_STAMINA?"体能不足 等待恢复后再接近":"条件未满足 返回查看目标",GAME_UI_INK);}
+  if(error&&error!=N_WRONG){game_ui_box(y,8,238,224,38);game_ui_text_fitted(y,16,248,208,error==N_BUSY?"Finish the event first":error==N_SAVE_FAILED?"Save failed. C: retry":error==N_NO_STAMINA?"Low stamina. Wait and return":"Not ready. Check your goal",GAME_UI_INK);}
   screen_push_band(y);
  }
 }

@@ -59,17 +59,17 @@ bool johto_story_legend_ready(const johto_story_t *s,const johto_state_t *j,unsi
  return !(s->legend_visits&(1u<<id))||(uint64_t)j->explorations>=(uint64_t)s->legend_at[id]+2;
 }
 const char *johto_story_legend_hint(const johto_story_t *s,const johto_state_t *j,unsigned id,bool feather){
- if(!s->tower_seen)return "四徽章后调查烧焦塔";
+ if(!s->tower_seen)return "After 4 badges: Burned Tower";
  if(id<2&&j->legend_clues[id]<3)return JOHTO_ROUTES[beast_route[id][j->legend_clues[id]]].name;
- if(id==2&&j->legend_clues[2]<3)return j->legend_clues[2]==0?"前往满金原野":j->legend_clues[2]==1?"前往漩涡列岛":"冒险笔记：净水试炼";
- if(id==3&&!feather)return "完成漩涡远征取得银色之羽";
- if(id==3&&j->legend_clues[3]<3)return "继续调查漩涡列岛";
- if(id==4&&j->badges!=255)return "先集齐八枚城都徽章";
- if(id==4&&(j->legend_clues[0]<3||j->legend_clues[1]<3||j->legend_clues[2]<3))return "完成三兽调查 不必捕获";
- if(id==4&&j->legend_clues[4]<3)return "前往铃铛塔调查虹色之羽";
- if(id==5&&j->phase!=JOHTO_COMPLETE)return "完成空木最终考验";
- if(id==5&&!(s->forest_visits&1))return "回访任一关都探索地图";
- if(id==5&&j->legend_clues[5]<3)return "回访桧皮林地调查时空裂隙";
- return johto_story_legend_ready(s,j,id,feather)?"追踪已定位 消耗10体能":"再完成两次城都探索";
+ if(id==2&&j->legend_clues[2]<3)return j->legend_clues[2]==0?"Go to Goldenrod Fields":j->legend_clues[2]==1?"Go to Whirl Islands":"Notes: Water Trial";
+ if(id==3&&!feather)return "Win Silver Wing in Whirl run";
+ if(id==3&&j->legend_clues[3]<3)return "Keep surveying Whirl Islands";
+ if(id==4&&j->badges!=255)return "Get all 8 Johto badges first";
+ if(id==4&&(j->legend_clues[0]<3||j->legend_clues[1]<3||j->legend_clues[2]<3))return "Finish beast survey (no catch)";
+ if(id==4&&j->legend_clues[4]<3)return "Bell Tower: Rainbow Wing";
+ if(id==5&&j->phase!=JOHTO_COMPLETE)return "Pass Elm's final trial";
+ if(id==5&&!(s->forest_visits&1))return "Revisit any Kanto map";
+ if(id==5&&j->legend_clues[5]<3)return "Ilex Woods: time rift";
+ return johto_story_legend_ready(s,j,id,feather)?"Target found. Costs 10 stamina":"2 more Johto explores";
 }
 bool johto_story_final_ready(const johto_story_t *s,const johto_state_t *j,uint16_t defeated,bool feather){return j->phase==JOHTO_COMPLETE||(johto_final_open(j,defeated)&&s->ruins==15&&s->rescues>=2&&feather&&s->tower_seen);}

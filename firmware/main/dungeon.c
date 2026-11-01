@@ -17,9 +17,9 @@ extern bool dungeon_host_commit(const void *data,size_t len);
 extern bool dungeon_host_load(void *data,size_t len);
 #endif
 #define DUNGEON_VERSION 6
-const char *const dungeon_nodes[8]={"林间入口","林间岔路","深林对战","营地","巡护精英","遗迹岔路","最后营地","森林首领"};
-const char *const dungeon_cards[DUNGEON_CARD_COUNT]={"烈焰印记","潮汐印记","雷鸣印记","强攻","冥想","坚守","疾风","会心","余温","营火","净化","接力盾","弱点追击","接力强攻","乘胜回复"};
-const char *const dungeon_desc[DUNGEON_CARD_COUNT]={"火系伙伴伤害增加25%","水系伙伴伤害增加25%","电系伙伴伤害增加25%","开场攻击提升一级","开场特攻提升一级","开场防御特防升一级","开场速度提升一级","开场更易击中要害","胜利存活伙伴回复15%","营地回复额外增加20%","开场清除异常状态","首次主动换入防御升一级","攻击异常对手伤害加25%","主动换入首击伤害加35%","攻击击倒对手回复15%"};
+const char *const dungeon_nodes[8]={"Woods Entrance","Woods Fork","Deep Woods Fight","Camp","Ranger Elite","Ruin Fork","Last Camp","Forest Boss"};
+const char *const dungeon_cards[DUNGEON_CARD_COUNT]={"Flame Mark","Tide Mark","Thunder Mark","Power Strike","Meditate","Hold Fast","Gale","Keen Eye","Afterglow","Campfire","Cleanse","Relay Shield","Weak Point Chase","Relay Assault","Victory Heal"};
+const char *const dungeon_desc[DUNGEON_CARD_COUNT]={"Fire Pokemon dmg +25%","Water Pokemon dmg +25%","Electric Pokemon dmg +25%","Start: Attack +1","Start: Sp.Atk +1","Start: Def/Sp.Def +1","Start: Speed +1","Start: higher crit chance","Win: survivors heal 15%","Camp heal +20%","Start: cure status","First swap-in: Def +1","Dmg vs statused foes +25%","Swap-in first hit +35%","KO heals you 15%"};
 static dungeon_t run;
 // Mutations run under the existing LVGL lock (buttons, debug keys and timers).
 // Keep the rollback candidate in BSS: esp_timer has only a 3584-byte stack.
@@ -255,7 +255,7 @@ bool dungeon_step(trainer_event_t *out){
  if(hit&&relay)d->relay_mask&=~(1u<<slot);
  if(knockout){combat_mon_t *a=&d->battle.session.sides[0].mons[slot];if(a->hp){unsigned hp=a->hp+a->max_hp*15/100;a->hp=hp>a->max_hp?a->max_hp:hp;out->attack.pet_hp=a->hp;}}
  if(!commit(d))return false;
- if(hit){if(knockout)feedback="乘胜回复 生命恢复";else if(relay)feedback="接力强攻 伤害增强";else if(pursuit)feedback="弱点追击 伤害增强";else if(boost)feedback="属性印记 伤害增强";}
+ if(hit){if(knockout)feedback="Victory Heal: HP restored";else if(relay)feedback="Relay Assault: dmg up";else if(pursuit)feedback="Weak Point: dmg up";else if(boost)feedback="Type Mark: dmg up";}
  return true;
 }
 bool dungeon_switch(unsigned slot,bool forced){
@@ -266,7 +266,7 @@ bool dungeon_switch(unsigned slot,bool forced){
  if(guard){combat_mon_t *m=&d->battle.session.sides[0].mons[slot];if(m->defense<6)m->defense++;d->guards|=1u<<slot;}
  if(!forced&&(d->cards&(1u<<13)))d->relay_mask|=1u<<slot;
  if(!commit(d))return false;
- if(guard)feedback="接力盾 防御提升";else if(!forced&&(d->cards&(1u<<13)))feedback="接力强攻 准备就绪";
+ if(guard)feedback="Relay Shield: Def up";else if(!forced&&(d->cards&(1u<<13)))feedback="Relay Assault ready";
  return true;
 }
 bool dungeon_retire(void){if(run.phase!=DUNGEON_BATTLE)return false;
@@ -300,7 +300,7 @@ bool dungeon_finish(void){
  return dungeon_resume();
 }
 
-const char *dungeon_theme_name(unsigned theme){const exploration_region_t *r=exploration_region(theme+3);return theme==9?"冠军远征":r?r->dungeon:"森林秘境";}
+const char *dungeon_theme_name(unsigned theme){const exploration_region_t *r=exploration_region(theme+3);return theme==9?"Champion Expedition":r?r->dungeon:"Forest Dungeon";}
 bool dungeon_theme_open(unsigned theme){
  if(!theme)return true;
  if(theme>9)return false;
@@ -309,7 +309,7 @@ bool dungeon_theme_open(unsigned theme){
  return exploration_map_open(theme+3,v.defeated,&v.regions);
 }
 const char *dungeon_node_name(void){
- static const char *const names[]={"地区入口","前方分路","深处对战","净化营地","地区精英","遗迹分路","中继营地","地区首领"};
+ static const char *const names[]={"Area Entrance","Fork Ahead","Deep Fight","Cleansing Camp","Area Elite","Ruin Fork","Relay Camp","Area Boss"};
  return run.theme?names[run.node]:dungeon_nodes[run.node];
 }
 bool dungeon_award_details(uint32_t id,unsigned node,dungeon_award_details_t *out){

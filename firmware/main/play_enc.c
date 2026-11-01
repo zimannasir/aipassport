@@ -127,11 +127,11 @@ static void draw_band(int band_y)
 
     // -- 标题 ----------------------------------------------------------
     snprintf(buf, sizeof(buf), "%u", q->count);
-    game_ui_title(band_y, "刚才路上遇到", buf);
+    game_ui_title(band_y, "Met on the road", buf);
 
     // -- 列表 ----------------------------------------------------------
     if (q->count == 0) {
-        render_text(12, Y(96), "队列是空的", GAME_UI_MUTED);
+        render_text(12, Y(96), "The queue is empty", GAME_UI_MUTED);
     }
     for (uint8_t i = 0; i < VISIBLE_ROWS; i++) {
         uint8_t idx = (uint8_t)(s_top + i);
@@ -173,7 +173,7 @@ static void draw_band(int band_y)
     }
 
     // -- 提示与三键 ------------------------------------------------------
-    render_text(12, Y(248), "稀有度越高越难捕获", GAME_UI_MUTED);
+    render_text(12, Y(248), "Rarer is harder to catch", GAME_UI_MUTED);
     game_ui_footer(band_y, game_ui_list_hint(q->count));
 
     if (s_trans_flash_black) {

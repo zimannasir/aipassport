@@ -7,8 +7,8 @@ static unsigned kind(const gym_rules_t *g,const trainer_session_t *s){
  if(g->kind!=GYM_ELM)return g->kind;
  unsigned n=s->sides[1].active;return n<2?GYM_VEIL:n==4?GYM_DRAGON:n==5?GYM_FIST:GYM_NONE;
 }
-const char *gym_rules_name(unsigned k){static const char *const names[]={"常规对战","暴风领域","虫巢协同","应援阵容","双相幻幕","蓄势重拳","钢铁阵列","寒潮推进","龙阵接力","空木三重试炼","湖泊狂怒"};return k<=GYM_LAKE?names[k]:names[0];}
-const char *gym_rules_hint(unsigned k){static const char *const hints[]={"使用伙伴熟悉的招式", "麻痹或降速压制风场", "火或飞行命中拆两层", "中毒灼伤阻止半血恢复", "物理特殊交替破解护幕", "降攻或控制解除蓄势", "两次火水特攻拆除装甲", "火系命中驱散寒潮", "两名伙伴不同属性破阵", "双输出破幕 控制压轴", "降攻或控制平息狂怒"};return k<=GYM_LAKE?hints[k]:hints[0];}
+const char *gym_rules_name(unsigned k){static const char *const names[]={"Standard Battle","Storm Field","Hive Synergy","Cheer Lineup","Dual Veil","Charged Fist","Steel Array","Cold Advance","Dragon Relay","Elm's Triple Trial","Lake Fury"};return k<=GYM_LAKE?names[k]:names[0];}
+const char *gym_rules_hint(unsigned k){static const char *const hints[]={"Use moves your team knows", "Paralyze/slow to pin the wind", "Fire/Flying hits break 2 layers", "Poison/burn blocks half heal", "Alternate Phys/Spec to break", "Lower Atk or control to stop", "2 Fire/Water Sp.Atk hits break", "Fire hits clear the cold", "Two Pokemon, two types", "2 attackers break, control last", "Weaken or control to calm it"};return k<=GYM_LAKE?hints[k]:hints[0];}
 void gym_rules_enter(gym_rules_t *g,trainer_session_t *s){
  if(!g||!g->version||s->sides[1].active>=6)return;
  gym_member_t *m=&g->member[s->sides[1].active];if(m->entered)return;
@@ -115,4 +115,4 @@ int gym_rules_switch(gym_rules_t *g,const trainer_session_t *s){
  return best;
 }
 
-const char *gym_rules_effect(unsigned k){static const char *const text[]={"标准等级与伤害", "提速50% 非克制减伤55%", "每层增伤25% 减伤20%", "半血回复30% 每只一次", "交替护幕 减伤30%或70%", "蓄势减伤60% 格斗双倍", "物理减伤70% 特殊40%", "每层减速15% 冰伤+25%", "龙鳞三回合 减伤50%", "护幕 雷雨 海天三阶段", "狂怒减伤50% 控制解除"};return k<=GYM_LAKE?text[k]:text[0];}
+const char *gym_rules_effect(unsigned k){static const char *const text[]={"Standard level and damage", "Speed +50%, non-SE dmg -55%", "Per layer: dmg +25%, taken -20%", "Half HP heal 30%, once each", "Alternating veil: -30%/-70%", "Charge: dmg -60%, Fighting x2", "Phys -70%, Special -40%", "Per layer: Spd -15%, Ice +25%", "Dragon scales 3 turns, -50%", "Veil, storm, sea-sky phases", "Rage: dmg -50%, control ends it"};return k<=GYM_LAKE?text[k]:text[0];}

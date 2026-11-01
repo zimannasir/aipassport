@@ -1,8 +1,8 @@
 {
-  "build": "b08ff8a4bb02af27ea24",
+  "build": "5f3d4b727692e568247e",
   "cases": 1152,
-  "visible_hits": 912,
-  "visible_misses": 240,
+  "visible_hits": 864,
+  "visible_misses": 288,
   "between_frames": 1056,
   "species": [
     10,
@@ -16,30 +16,26 @@
   "timelines": [
     {
       "save_delay_ms": 0,
-      "result_ms": 9150,
-      "exit_ms": 13150
+      "result_ms": 9200,
+      "exit_ms": 13200
     },
     {
       "save_delay_ms": 180,
-      "result_ms": 9330,
-      "exit_ms": 13330
+      "result_ms": 9390,
+      "exit_ms": 13390
     },
     {
       "save_delay_ms": 400,
-      "result_ms": 9550,
-      "exit_ms": 13550
+      "result_ms": 9610,
+      "exit_ms": 13610
     },
     {
       "save_delay_ms": 2000,
-      "result_ms": 11150,
-      "exit_ms": 15150
+      "result_ms": 11210,
+      "exit_ms": 15210
     }
   ],
-  "baseline": {
-    "attempts_after_press": 0,
-    "animation_after_press": false,
-    "visible_hit_rejected": true
-  },
+  "baseline": null,
   "physical_device_fps_measured": false,
   "passed": true
 }

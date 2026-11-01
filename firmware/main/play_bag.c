@@ -142,7 +142,7 @@ static void wrap_description(const char *text)
 static void select_description(void)
 {
     const item_info_t *info = items_info(s_selected);
-    wrap_description(info ? info->description : "道具资料暂不可用");
+    wrap_description(info ? info->description : "Item data unavailable");
 }
 
 static void draw_item_icon(int band_y, uint8_t item, int y)
@@ -191,12 +191,12 @@ static void draw_band(int band_y)
     species_t sp;
     if (assets_species(s_world.species, &sp))
         snprintf(text, sizeof(text), "%.*s Lv%u", sp.name_zh_len, sp.name_zh, s_world.level);
-    else snprintf(text, sizeof(text), "伙伴");
-    game_ui_title(band_y, "背包", text);
+    else snprintf(text, sizeof(text), "Pokemon");
+    game_ui_title(band_y, "Bag", text);
 
     uint8_t start = pocket_start(), end = pocket_end(), first = first_row();
-    const char *pocket = s_selected < ITEM_BALL_COUNT ? "精灵球"
-                        : s_selected < ITEM_BERRY ? "进化道具" : s_selected < ITEM_SUN_STONE ? "养成道具" : "城都进化道具";
+    const char *pocket = s_selected < ITEM_BALL_COUNT ? "Poke Ball"
+                        : s_selected < ITEM_BERRY ? "Evolution items" : s_selected < ITEM_SUN_STONE ? "Care items" : "Johto evolution items";
     render_text(12, 40 - band_y, pocket, GAME_UI_INK);
     snprintf(text, sizeof(text), "%u/%u", (first - start) / BAG_ROWS + 1,
              (end - start + BAG_ROWS - 1) / BAG_ROWS);
@@ -209,11 +209,11 @@ static void draw_band(int band_y)
         uint16_t color = item == s_selected || s_inventory.quantity[item] ? GAME_UI_INK : GAME_UI_MUTED;
         if (item == s_selected) game_ui_cursor(band_y, 12, y + 3);
         draw_item_icon(band_y, item, y);
-        render_text(56, y - band_y, info ? info->name : "未知道具", color);
+        render_text(56, y - band_y, info ? info->name : "Unknown item", color);
         snprintf(text, sizeof(text), "x%u", s_inventory.quantity[item]);
         render_text(228 - render_text_width(text), y - band_y, text, color);
     }
-    render_text(12, 164 - band_y, "长按B返回", GAME_UI_MUTED);
+    render_text(12, 164 - band_y, "Hold B: back", GAME_UI_MUTED);
     snprintf(text, sizeof(text), "%02u/%u", s_selected + 1, ITEM_COUNT);
     render_text(228 - render_text_width(text), 164 - band_y, text, GAME_UI_MUTED);
 
@@ -222,7 +222,7 @@ static void draw_band(int band_y)
         render_text(BAG_TEXT_X, BAG_DESCRIPTION_Y + row * BAG_DESCRIPTION_STEP - band_y,
                       s_description[row], GAME_UI_INK);
     const char *feedback = s_feedback[0] ? s_feedback
-        : s_selected < ITEM_BALL_COUNT ? "请在捕获页选球使用" : "对当前伙伴使用";
+        : s_selected < ITEM_BALL_COUNT ? "Use balls on Catch screen" : "Use on current Pokemon";
     game_ui_text_centered(band_y, BAG_TEXT_X, BAG_FEEDBACK_Y, BAG_TEXT_W, BAG_TEXT_H,
                           feedback, s_success ? GAME_UI_ACCENT : s_feedback[0] ? GAME_UI_INK : GAME_UI_MUTED);
     game_ui_footer(band_y, s_selected < ITEM_BALL_COUNT
@@ -260,32 +260,32 @@ static void use_selected(void)
 {
     s_success = false;
     if (s_selected < ITEM_BALL_COUNT) {
-        snprintf(s_feedback, sizeof(s_feedback), "请在捕获页选球使用");
+        snprintf(s_feedback, sizeof(s_feedback), "Use balls on Catch screen");
         return;
     }
     item_use_result_t preview;
     if(items_apply(s_selected,s_world.species,s_world.level,&s_world.pet,&preview)==ITEM_USE_OK &&
        preview.species_after!=preview.species_before) {
         inventory_t inventory;world_inventory_snapshot(&inventory);
-        if(!inventory.quantity[s_selected]){snprintf(s_feedback,sizeof(s_feedback),"道具不足");return;}
+        if(!inventory.quantity[s_selected]){snprintf(s_feedback,sizeof(s_feedback),"Not enough items");return;}
         if(!evolution_ui_begin(preview.species_before,preview.species_after,s_selected))
-            snprintf(s_feedback,sizeof(s_feedback),"无法开始进化");
+            snprintf(s_feedback,sizeof(s_feedback),"Can't start evolution");
         return;
     }
     item_use_result_t result;
     item_use_status_t status = world_item_use(s_world.species, s_selected, &result);
     refresh_snapshot();
-    const char *message = "道具无效";
+    const char *message = "Item has no effect";
     switch (status) {
     case ITEM_USE_OK: {
         s_success = true;
         sfx_play(result.species_before != result.species_after ? SFX_EVOLVE : SFX_CARE);
         species_t evolved;
         if (result.species_before != result.species_after && assets_species(result.species_after, &evolved)) {
-            snprintf(s_feedback, sizeof(s_feedback), "进化成%.*s了", evolved.name_zh_len, evolved.name_zh);
+            snprintf(s_feedback, sizeof(s_feedback), "Evolved into %.*s!", evolved.name_zh_len, evolved.name_zh);
             return;
         }
-        const char *labels[] = {"饱食", "心情", "体能", "亲密"};
+        const char *labels[] = {"Full", "Mood", "Stamina", "Bond"};
         const int32_t before[] = {result.before.satiety, result.before.mood, result.before.stamina, result.before.intimacy};
         const int32_t after[] = {result.after.satiety, result.after.mood, result.after.stamina, result.after.intimacy};
         size_t used = 0;
@@ -298,16 +298,16 @@ static void use_selected(void)
             shown++;
         }
         if (shown) return;
-        message = "使用成功";
+        message = "Used it";
         break;
     }
-    case ITEM_USE_EMPTY: message = "这个道具用完了"; break;
-    case ITEM_USE_WRONG_TARGET: message = "伙伴已更换 请重试"; break;
-    case ITEM_USE_NOT_APPLICABLE: message = "对当前伙伴无效"; break;
-    case ITEM_USE_LEVEL_TOO_LOW: message = "等级还不够"; break;
-    case ITEM_USE_SAVE_FAILED: message = "保存失败 请重试"; break;
-    case ITEM_USE_STORAGE_UNAVAILABLE: message = "存档暂不可用"; break;
-    case ITEM_USE_BUSY: message = "请先结束当前对战"; break;
+    case ITEM_USE_EMPTY: message = "Out of this item"; break;
+    case ITEM_USE_WRONG_TARGET: message = "Pokemon changed. Retry"; break;
+    case ITEM_USE_NOT_APPLICABLE: message = "No effect on this Pokemon"; break;
+    case ITEM_USE_LEVEL_TOO_LOW: message = "Level too low"; break;
+    case ITEM_USE_SAVE_FAILED: message = "Save failed. Retry"; break;
+    case ITEM_USE_STORAGE_UNAVAILABLE: message = "Save unavailable"; break;
+    case ITEM_USE_BUSY: message = "Finish current battle first"; break;
     default: break;
     }
     snprintf(s_feedback, sizeof(s_feedback), "%s", message);

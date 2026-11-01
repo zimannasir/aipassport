@@ -65,7 +65,7 @@ static void light(int band,unsigned age,unsigned angle){
 }
 static void draw(int band){
  screen_band_clear(GAME_UI_BG);
- game_ui_title(band,committed?"进化成功！":"伙伴正在进化",NULL);
+ game_ui_title(band,committed?"Evolution complete!":"Pokemon is evolving",NULL);
  species_t sp;uint16_t id=committed?new_species:failed?old_species:shown_species();
  if(assets_species(id,&sp)){
   uint8_t size=0;const uint8_t *sprite=assets_front_sprite(id,&size);
@@ -84,17 +84,17 @@ static void draw(int band){
  char text[80],name[40];species_t named;
  game_ui_box(band,8,238,224,72);
  if(failed){
-  game_ui_text_centered(band,16,248,208,16,"进化未保存",GAME_UI_INK);
-  game_ui_text_centered(band,16,278,208,16,"C重试 长按B取消",GAME_UI_MUTED);
+  game_ui_text_centered(band,16,248,208,16,"Evolution not saved",GAME_UI_INK);
+  game_ui_text_centered(band,16,278,208,16,"C: retry  Hold B: cancel",GAME_UI_MUTED);
  }else if(committed){
-  if(assets_species(new_species,&named))snprintf(name,sizeof(name),"%.*s",named.name_zh_len,named.name_zh);else snprintf(name,sizeof(name),"伙伴");
-  snprintf(text,sizeof(text),"进化成%s了！",name);game_ui_text_centered(band,16,248,208,16,text,GAME_UI_INK);
-  if(new_moves)snprintf(text,sizeof(text),"新学会%u招 C确认",new_moves);
-  else snprintf(text,sizeof(text),"C确认继续冒险");
-  game_ui_text_centered(band,16,278,208,16,frame>=DONE_FRAME&&audio_stage>=3?text:"新伙伴诞生了",GAME_UI_MUTED);
+  if(assets_species(new_species,&named))snprintf(name,sizeof(name),"%.*s",named.name_zh_len,named.name_zh);else snprintf(name,sizeof(name),"Pokemon");
+  snprintf(text,sizeof(text),"Evolved into %s!",name);game_ui_text_centered(band,16,248,208,16,text,GAME_UI_INK);
+  if(new_moves)snprintf(text,sizeof(text),"%u new moves. C: OK",new_moves);
+  else snprintf(text,sizeof(text),"C: continue");
+  game_ui_text_centered(band,16,278,208,16,frame>=DONE_FRAME&&audio_stage>=3?text:"A new Pokemon is born",GAME_UI_MUTED);
  }else{
-  game_ui_text_centered(band,16,248,208,16,"伙伴的样子正在变化！",GAME_UI_INK);
-  game_ui_text_centered(band,16,278,208,16,"长按B取消进化",GAME_UI_MUTED);
+  game_ui_text_centered(band,16,248,208,16,"It's changing shape!",GAME_UI_INK);
+  game_ui_text_centered(band,16,278,208,16,"Hold B: cancel",GAME_UI_MUTED);
  }
 }
 static void commit(void){

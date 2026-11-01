@@ -59,9 +59,9 @@ uint16_t cap_ball_factor_1000(cap_ball_t ball, const cap_context_t *context)
 
 const char *cap_ball_name(cap_ball_t b)
 {
-    static const char *N[CAP_BALL_COUNT] = {"精灵球", "超级球", "高级球", "大师球",
-        "速度球", "沉重球", "等级球", "友友球"};
-    return ((unsigned)b < CAP_BALL_COUNT) ? N[b] : "精灵球";
+    static const char *N[CAP_BALL_COUNT] = {"Poke Ball", "Great Ball", "Ultra Ball", "Master Ball",
+        "Fast Ball", "Heavy Ball", "Level Ball", "Friend Ball"};
+    return ((unsigned)b < CAP_BALL_COUNT) ? N[b] : "Poke Ball";
 }
 
 // 逃跑概率 ×1000，按稀有度。⏳ 这条曲线纯凭手感，待实测校准

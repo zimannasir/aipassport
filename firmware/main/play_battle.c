@@ -401,16 +401,16 @@ static void draw_band(int band_y)
     // 单行最坏 256px 超 232px 上限（野生多刺菊石兽 + 尖刺加农炮），
     // 拆两行后最坏 144px（「使用了尖刺加农炮！」）。
     if (s_escape_prompt) {
-        render_text(MSG_X, Y(MSG_Y), "要尝试逃跑吗？", C_INK);
-        render_text(MSG_X, Y(MSG_DETAIL_Y), "失败后对方会反击", GAME_UI_MUTED);
+        render_text(MSG_X, Y(MSG_Y), "Try to run?", C_INK);
+        render_text(MSG_X, Y(MSG_DETAIL_Y), "It strikes back if you fail", GAME_UI_MUTED);
     } else if(s_settle_failed){
-        render_text(MSG_X,Y(MSG_Y),"结算保存失败",C_INK);
-        render_text(MSG_X,Y(MSG_DETAIL_Y),"按C重试 奖励不会重复",GAME_UI_MUTED);
+        render_text(MSG_X,Y(MSG_Y),"Result save failed",C_INK);
+        render_text(MSG_X,Y(MSG_DETAIL_Y),"C: retry. No double reward",GAME_UI_MUTED);
     } else if (s_escape_feedback) {
         render_text(MSG_X, Y(MSG_Y), s_escape_feedback == ESCAPE_SUCCESS
-                    ? "成功逃跑了！" : "没能逃跑！", C_INK);
+                    ? "Got away safely!" : "Can't escape!", C_INK);
         if (s_escape_feedback == ESCAPE_FAILED)
-            render_text(MSG_X, Y(MSG_DETAIL_Y), "对方准备反击", GAME_UI_MUTED);
+            render_text(MSG_X, Y(MSG_DETAIL_Y), "It prepares to strike", GAME_UI_MUTED);
     } else if (!s_done && s_play_i > 0 && s_play_i <= s_res.round_count) {
         const battle_round_t *r = &s_res.rounds[s_play_i - 1];
         char who[32];
@@ -418,7 +418,7 @@ static void draw_band(int band_y)
             snprintf(who, sizeof(who), "%.*s",
                      pet_sp.name_zh_len, pet_sp.name_zh);
         } else if (!r->by_pet && has_wild) {
-            snprintf(who, sizeof(who), "野生%.*s",
+            snprintf(who, sizeof(who), "Wild %.*s",
                      wild_sp.name_zh_len, wild_sp.name_zh);
         } else {
             who[0] = '\0';
@@ -431,11 +431,11 @@ static void draw_band(int band_y)
         // 第二行：做了什么 + 伤害
         if (r->skipped) {snprintf(buf,sizeof(buf),"%s",combat_feedback(r));
         } else if (r->missed) {
-            snprintf(buf, sizeof(buf), "的攻击落空了！");
+            snprintf(buf, sizeof(buf), "attack missed!");
         } else {
             move_t display;
             bool named = combat_move(r->move_id, &display);
-            snprintf(buf, sizeof(buf), "使用了%.*s！",
+            snprintf(buf, sizeof(buf), "used %.*s!",
                      named ? display.name_zh_len : r->move_zh_len,
                      named ? display.name_zh : r->move_zh ? r->move_zh : "");
         }
@@ -444,60 +444,60 @@ static void draw_band(int band_y)
         unsigned gained = s_exp_anim
             ? (unsigned)s_res.exp * s_exp_frame / BATTLE_PRESENTATION_EXP_FRAMES : s_res.exp;
         if (s_res.won) {
-            if(exploration_chain_encounter(&nav_ctx()->enc))snprintf(buf,sizeof(buf),"连胜%lu 经验+%u",(unsigned long)world_exploration_chain(),gained);
-            else snprintf(buf, sizeof(buf), "胜利 经验 +%u", gained);
+            if(exploration_chain_encounter(&nav_ctx()->enc))snprintf(buf,sizeof(buf),"Streak %lu EXP+%u",(unsigned long)world_exploration_chain(),gained);
+            else snprintf(buf, sizeof(buf), "Won! EXP +%u", gained);
             game_ui_text_fitted(band_y,MSG_X,MSG_Y,MSG_RIGHT-MSG_X,buf,C_INK);
             const item_info_t *item = items_info(s_session.loot_item);
-            if (s_loot_failed) snprintf(buf, sizeof(buf), "掉落保存失败，请重试");
+            if (s_loot_failed) snprintf(buf, sizeof(buf), "Drop save failed. Retry");
             else if (item && s_session.loot_qty)
-                snprintf(buf, sizeof(buf), "获得%s ×%u", item->name, s_session.loot_qty);
-            else if (item && s_session.loot_full) snprintf(buf, sizeof(buf), "%s已满", item->name);
-            else snprintf(buf, sizeof(buf), "这次没有掉落");
+                snprintf(buf, sizeof(buf), "Got %s x%u", item->name, s_session.loot_qty);
+            else if (item && s_session.loot_full) snprintf(buf, sizeof(buf), "%s is full", item->name);
+            else snprintf(buf, sizeof(buf), "No drops this time");
             render_text(MSG_X, Y(MSG_DETAIL_Y), buf, GAME_UI_MUTED);
         } else {
-            snprintf(buf, sizeof(buf), "战败 经验 +%u", gained);
+            snprintf(buf, sizeof(buf), "Lost. EXP +%u", gained);
             render_text(MSG_X, Y(MSG_Y), buf, C_INK);
-            game_ui_text_fitted(band_y,MSG_X,MSG_DETAIL_Y,MSG_RIGHT-MSG_X,exploration_chain_encounter(&nav_ctx()->enc)?"连胜中断 体能-20":"体能 -20 心情 -15",GAME_UI_MUTED);
+            game_ui_text_fitted(band_y,MSG_X,MSG_DETAIL_Y,MSG_RIGHT-MSG_X,exploration_chain_encounter(&nav_ctx()->enc)?"Streak lost. Stamina -20":"Stamina -20 Mood -15",GAME_UI_MUTED);
         }
     } else {
-        const char *message = s_store_failed ? "保存失败，请重试"
-            : s_session.started ? "继续捕捉，还是战斗？" : "野生宝可梦出现了！";
+        const char *message = s_store_failed ? "Save failed. Retry"
+            : s_session.started ? "Keep catching or fight?" : "A wild Pokemon appeared!";
         render_text(MSG_X, Y(MSG_Y), message, C_INK);
         if (!s_entering && !s_wild_animating && !shiny_entry_side(&s_shiny_entry) && has_pet && has_wild) {
             uint16_t chance = battle_escape_chance(
                 battle_effective_stat(pet_sp.speed, s_session.pet_level),
                 battle_effective_stat(wild_sp.speed, s_session.wild_level), s_session.escape_attempts);
-            snprintf(buf, sizeof(buf), "逃跑成功率 %u%%", chance * 100 / 256);
+            snprintf(buf, sizeof(buf), "Escape chance %u%%", chance * 100 / 256);
             render_text(MSG_X, Y(MSG_DETAIL_Y), buf, GAME_UI_MUTED);
         }
     }
 
     // -- 三键 --------------------------------------------------------------
     const char *hint = s_escape_feedback ? ""
-        : (s_entering || s_wild_animating || shiny_entry_side(&s_shiny_entry)) ? "宝可梦出场中"
-        : s_exp_anim ? "正在获得经验"
-        : (s_loot_failed||s_settle_failed) ? "[C]重试保存"
-        : s_counter_anim ? (s_counter_escape ? "逃跑失败，对方反击" : "野生宝可梦正在反击")
-        : s_done ? (s_session.won ? "选择投球或返回" : "选择照料或返回")
-        : s_escape_requested ? "招式结束后尝试逃跑"
-        : s_playing ? "长按B逃跑" : "A上 B下 C确认 长按B返回";
+        : (s_entering || s_wild_animating || shiny_entry_side(&s_shiny_entry)) ? "Sending out Pokemon"
+        : s_exp_anim ? "Gaining EXP"
+        : (s_loot_failed||s_settle_failed) ? "[C] Retry save"
+        : s_counter_anim ? (s_counter_escape ? "Can't escape! It strikes" : "The wild Pokemon strikes")
+        : s_done ? (s_session.won ? "Pick a ball or go back" : "Pick care or go back")
+        : s_escape_requested ? "Will run after this move"
+        : s_playing ? "Hold B: run" : "A Up B Dn C OK Hold B Back";
     char attack_hint[80];
     if (!s_done && s_playing && !s_escape_requested && s_play_i > 0 && s_play_i <= s_res.round_count &&
         (s_track_preview || s_clock.elapsed_ms>=s_timing.feedback_start)) {
         const battle_round_t *r = &s_res.rounds[s_play_i-1];
         const char *effect = combat_feedback(r);
-        if(!s_track_preview&&s_timing.faint_mask&&s_clock.elapsed_ms>=s_timing.faint_start)effect="失去战斗能力";
-        if(r->charging||r->skipped||r->self_target||r->no_effect||!r->damage)snprintf(attack_hint,sizeof(attack_hint),"%s",effect?effect:"长按B逃跑");
-        else if (r->missed) snprintf(attack_hint,sizeof(attack_hint),"长按B逃跑");
-        else snprintf(attack_hint,sizeof(attack_hint),"%s -%uHP 长按B逃跑",effect?effect:"",r->damage);
+        if(!s_track_preview&&s_timing.faint_mask&&s_clock.elapsed_ms>=s_timing.faint_start)effect="Fainted";
+        if(r->charging||r->skipped||r->self_target||r->no_effect||!r->damage)snprintf(attack_hint,sizeof(attack_hint),"%s",effect?effect:"Hold B: run");
+        else if (r->missed) snprintf(attack_hint,sizeof(attack_hint),"Hold B: run");
+        else snprintf(attack_hint,sizeof(attack_hint),"%s -%uHP  Hold B: run",effect?effect:"",r->damage);
         hint = attack_hint;
     }
     if (s_escape_prompt) {
-        static const char *const labels[] = {"继续", "逃跑"};
+        static const char *const labels[] = {"Continue", "Run"};
         game_ui_action_row(band_y, MSG_X, MSG_HINT_Y, MSG_RIGHT - MSG_X, labels, 2, s_escape_choice);
     } else if (!s_entering && !s_wild_animating && !shiny_entry_side(&s_shiny_entry) && !s_exp_anim && !s_playing &&
                !s_escape_feedback && !s_settle_failed && !s_loot_failed) {
-        const char *const labels[] = {s_done ? (s_session.won ? "投球" : "照料") : "捕获", s_done ? "返回" : "战斗", "逃跑"};
+        const char *const labels[] = {s_done ? (s_session.won ? "Throw" : "Care") : "Catch", s_done ? "Back" : "Fight", "Run"};
         game_ui_action_row(band_y, MSG_X, MSG_HINT_Y, MSG_RIGHT - MSG_X, labels, s_done ? 2 : 3, s_choice);
     } else game_ui_text_centered(band_y, MSG_X, MSG_HINT_Y, MSG_RIGHT - MSG_X, 16, hint, C_INK);
     }
