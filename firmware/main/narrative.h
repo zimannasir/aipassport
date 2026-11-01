@@ -95,43 +95,43 @@ static inline unsigned narrative_advance(narrative_context_t *c,unsigned s,unsig
 static inline narrative_goal_t narrative_goal(const narrative_context_t *c){
  #define GO(t,p,d,a,i) return (narrative_goal_t){t,p,d,a,i}
  const johto_state_t *j=&c->chapter;const johto_story_t *s=&c->story;unsigned b=johto_badges(j);
- if(c->battle)GO("继续当前对战","对战现场","完成对战后继续调查",N_GO_BATTLE,0);
- if(c->activity)GO("正在进行的调查","城都活动","先带回本次调查记录",N_GO_ACTIVITY,c->activity);
- if(c->dungeon)GO("继续当前秘境","秘境营地","结束后可以继续剧情",N_GO_DUNGEON,0);
- if(c->state.legend)GO("传说就在眼前","调查现场","锁定的遭遇仍在等你",N_GO_LEGEND,c->state.legend-1);
- if(j->phase<JOHTO_ACTIVE)GO("抵达城都","空木研究所","选择同行伙伴",N_GO_STARTER,0);
+ if(c->battle)GO("Continue the battle","Battle site","Finish it, then go on",N_GO_BATTLE,0);
+ if(c->activity)GO("Survey in progress","Johto events","Bring back this record",N_GO_ACTIVITY,c->activity);
+ if(c->dungeon)GO("Continue the dungeon","Dungeon camp","Story resumes afterwards",N_GO_DUNGEON,0);
+ if(c->state.legend)GO("A legend is near","Survey site","A locked encounter awaits",N_GO_LEGEND,c->state.legend-1);
+ if(j->phase<JOHTO_ACTIVE)GO("Reach Johto","Elm's Lab","Pick a companion",N_GO_STARTER,0);
  if(j->phase==JOHTO_COMPLETE){
-  if(!(s->forest_visits&1))GO("森林里的回声","关都任一探索地图","调查一次熟悉的地方",N_GO_KANTO_ROUTE,0);
-  if(j->legend_clues[5]<3)GO("重叠的森林","桧皮林地","沿树木的回声继续调查",N_GO_ROUTE,1);
-  if(!(s->legend_visits&(1u<<5)))GO("时间另一侧","桧皮林地","前往回声交汇的地方",N_GO_LEGEND,5);
-  GO("旅程仍在继续","城都各地","自由探索与重复调查",N_GO_FREE,0);
+  if(!(s->forest_visits&1))GO("Echoes in the Forest","Any Kanto explore map","Survey a familiar place",N_GO_KANTO_ROUTE,0);
+  if(j->legend_clues[5]<3)GO("The Layered Forest","Ilex Woods","Follow the trees' echoes",N_GO_ROUTE,1);
+  if(!(s->legend_visits&(1u<<5)))GO("Across Time","Ilex Woods","Go where echoes meet",N_GO_LEGEND,5);
+  GO("The journey goes on","All of Johto","Free roam and re-surveys",N_GO_FREE,0);
  }
- if(c->state.legacy_final)GO("最后一项研究","空木研究所","之前的挑战资格仍然有效",N_GO_GYM,8);
- if(!b){if(!j->research[0])GO("新的调查记录","若叶郊野","观察一次迁徙的伙伴",N_GO_ROUTE,0);GO("调查者的准备","阿速道馆","赢得首枚城都徽章",N_GO_GYM,0);}
- if(b<2)GO("林地的邀请","阿笔道馆","取得第二枚城都徽章",N_GO_GYM,1);
- if(!c->state.bug_evidence&&!c->bug_completed)GO("虫群为何绕路","捕虫调查","走完六个观察点即可",N_GO_BUG,0);
- if(b<3)GO("前往遗迹","小茜道馆","取得第三枚城都徽章",N_GO_GYM,2);
- if(!(s->ruins&1))GO("石壁上的记录","缘朱遗迹","读懂第一组符号",N_GO_RUIN,0);
- if(!s->rescues){if(johto_rescue_ready(s,j)||s->rescue_step)GO("原野传来求救声","满金伙伴救助","跟随足迹接回伙伴",N_GO_RESCUE,0);GO("寻找失散的伙伴","满金原野","继续调查留下的足迹",N_GO_ROUTE,2);}
- if(b<4)GO("塔中的影子","松叶道馆","取得第四枚城都徽章",N_GO_GYM,3);
- if(!s->tower_seen)GO("三道身影","烧焦塔","记录塔里的异象",N_GO_TOWER,0);
- if(b>=5&&c->lake!=LAKE_RECEIVED)GO("湖上的红影","愤怒之湖","循着鳞片调查电波",N_GO_LAKE,0);
- if(b>=6&&!c->feather)GO("海上的呼唤","漩涡分层远征","深入海渊取得银色之羽",N_GO_SEA,0);
+ if(c->state.legacy_final)GO("The Last Study","Elm's Lab","Old unlocks still hold",N_GO_GYM,8);
+ if(!b){if(!j->research[0])GO("New survey record","Sprout Fields","Watch a migrating Pokemon",N_GO_ROUTE,0);GO("Surveyor's Prep","Falkner's Gym","Win the first Johto badge",N_GO_GYM,0);}
+ if(b<2)GO("Invitation from the Grove","Bugsy's Gym","Win the 2nd Johto badge",N_GO_GYM,1);
+ if(!c->state.bug_evidence&&!c->bug_completed)GO("Why the Swarm Detours","Bug Survey","Visit all six sites",N_GO_BUG,0);
+ if(b<3)GO("Head to the Ruins","Whitney's Gym","Win the 3rd Johto badge",N_GO_GYM,2);
+ if(!(s->ruins&1))GO("Marks on the Wall","Alph Ruins","Read the first symbols",N_GO_RUIN,0);
+ if(!s->rescues){if(johto_rescue_ready(s,j)||s->rescue_step)GO("A Cry from the Field","Goldenrod Rescue","Follow tracks, bring it",N_GO_RESCUE,0);GO("Find the Lost Pokemon","Goldenrod Fields","Keep tracing footprints",N_GO_ROUTE,2);}
+ if(b<4)GO("Shadow in the Tower","Morty's Gym","Win the 4th Johto badge",N_GO_GYM,3);
+ if(!s->tower_seen)GO("Three Figures","Burned Tower","Log the tower's visions",N_GO_TOWER,0);
+ if(b>=5&&c->lake!=LAKE_RECEIVED)GO("Red Shadow on the Lake","Lake of Rage","Trace the signal's scale",N_GO_LAKE,0);
+ if(b>=6&&!c->feather)GO("Call from the Sea","Whirl Deep Expedition","Get the Silver Wing below",N_GO_SEA,0);
  for(unsigned n=0;n<3;n++){
   unsigned id=(c->state.focus+n)%3,clue=j->legend_clues[id];
-  if(clue==3){if(!(s->legend_visits&(1u<<id)))GO("痕迹的尽头","传说调查现场","确认接近 可暂缓返回",N_GO_LEGEND,id);continue;}
-  if(id==2&&clue==2)GO("让清水再次流动","水君净水试炼","观察水流受阻的原因",N_GO_PURIFY,0);
+  if(clue==3){if(!(s->legend_visits&(1u<<id)))GO("End of the Trail","Legend survey site","Close. Return can wait",N_GO_LEGEND,id);continue;}
+  if(id==2&&clue==2)GO("Make the Water Flow Again","Suicune Water Trial","Find what blocks the flow",N_GO_PURIFY,0);
   unsigned route=id==0?(unsigned[]){4,2,5}[clue]:id==1?(unsigned[]){4,1,7}[clue]:(unsigned[]){2,6}[clue];
-  if(!johto_route_open(j,route))GO("通往下一条线索",JOHTO_TRAINERS[b].name,"先取得下一枚城都徽章",N_GO_GYM,b);
-  GO(id==0?"追寻雷鸣":id==1?"追寻焦痕":"追寻清水",JOHTO_ROUTES[route].name,id==0?"寻找被雷击的树木":id==1?"辨认温热的足迹":"寻找清澈水流的源头",N_GO_ROUTE,route);
+  if(!johto_route_open(j,route))GO("Toward the next clue",JOHTO_TRAINERS[b].name,"Win the next badge first",N_GO_GYM,b);
+  GO(id==0?"Chase the Thunder":id==1?"Chase the Scorch Marks":"Chase the Clear Water",JOHTO_ROUTES[route].name,id==0?"Find the struck tree":id==1?"Spot the warm footprints":"Find the clear spring",N_GO_ROUTE,route);
  }
- if(b<8)GO("塔顶的许可",JOHTO_TRAINERS[b].name,"取得下一枚城都徽章",N_GO_GYM,b);
- if(j->legend_clues[3]<3)GO("银羽的回应","漩涡列岛","继续调查海风的方向",N_GO_ROUTE,6);
- if(!(s->legend_visits&(1u<<3)))GO("银羽的回应","漩涡列岛","接近海渊声音的主人",N_GO_LEGEND,3);
- if(j->legend_clues[4]<3)GO("壁画中的彩虹","铃铛塔","寻找羽毛留下的光",N_GO_ROUTE,7);
- if(!(s->legend_visits&(1u<<4)))GO("彩虹的主人","铃铛塔","循着光靠近塔顶",N_GO_LEGEND,4);
- if((c->defeated&0x20ff)!=0x20ff)GO("来自关都的约定","关都道馆与赤红","完成关都八徽章及赤红战",N_GO_KANTO,0);
- GO("最后一项研究","空木研究所","以完整队伍接受考验",N_GO_GYM,8);
+ if(b<8)GO("Permission at the Top",JOHTO_TRAINERS[b].name,"Win the next Johto badge",N_GO_GYM,b);
+ if(j->legend_clues[3]<3)GO("The Silver Wing Answers","Whirl Islands","Follow the sea wind",N_GO_ROUTE,6);
+ if(!(s->legend_visits&(1u<<3)))GO("The Silver Wing Answers","Whirl Islands","Near the deep's voice",N_GO_LEGEND,3);
+ if(j->legend_clues[4]<3)GO("Rainbow in the Mural","Bell Tower","Find the wing's light",N_GO_ROUTE,7);
+ if(!(s->legend_visits&(1u<<4)))GO("Master of the Rainbow","Bell Tower","Follow light up the tower",N_GO_LEGEND,4);
+ if((c->defeated&0x20ff)!=0x20ff)GO("A Promise from Kanto","Kanto Gyms and Red","8 Kanto badges, face Red",N_GO_KANTO,0);
+ GO("The Last Study","Elm's Lab","Take the trial, full team",N_GO_GYM,8);
  #undef GO
 }
 // Return one new scene at a safe UI boundary. No popping mid-battle or mid-reward.

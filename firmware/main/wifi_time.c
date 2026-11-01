@@ -76,7 +76,7 @@ static bool ap_request(httpd_req_t *req){
 static esp_err_t page(httpd_req_t *req){
  if(!ap_request(req))return httpd_resp_send_err(req,HTTPD_403_FORBIDDEN,"Setup is not active");
  wifi_time_view_t v;wifi_time_view(&v);static char html[1700];
- snprintf(html,sizeof(html),"<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>PokeWalk Wi-Fi</title><style>body{max-width:420px;margin:40px auto;padding:20px;background:#f2efe5;color:#29302b;font:16px sans-serif}input,button{display:block;width:100%%;box-sizing:border-box;padding:12px;margin:10px 0 24px}button{background:#355c3d;color:white;border:0}</style><h1>PokeWalk Wi-Fi 校时</h1><p>连接 2.4GHz 家庭 Wi-Fi 或手机热点。配置成功后，设备开机自动联网，补回关机期间的体能。</p><form method=post action=/configure><input type=hidden name=token value='%s'><label>Wi-Fi 名称<input name=ssid maxlength=32 required autocomplete=off></label><label>Wi-Fi 密码<input name=password type=password maxlength=64 autocomplete=new-password></label><button>连接并保存</button></form><p>密码仅保存在这台设备，不进入游戏存档备份。首次校时建立基准，之前的关机时间无法补算。</p>",v.password);
+ snprintf(html,sizeof(html),"<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>PokeWalk Wi-Fi</title><style>body{max-width:420px;margin:40px auto;padding:20px;background:#f2efe5;color:#29302b;font:16px sans-serif}input,button{display:block;width:100%%;box-sizing:border-box;padding:12px;margin:10px 0 24px}button{background:#355c3d;color:white;border:0}</style><h1>PokeWalk Wi-Fi clock sync</h1><p>Connect to a 2.4GHz home Wi-Fi or phone hotspot. Once set up, the device joins automatically at boot and restores stamina for the time it was off.</p><form method=post action=/configure><input type=hidden name=token value='%s'><label>Wi-Fi name<input name=ssid maxlength=32 required autocomplete=off></label><label>Wi-Fi password<input name=password type=password maxlength=64 autocomplete=new-password></label><button>Connect and save</button></form><p>The password stays on this device and is not included in save backups. The first sync sets a baseline; earlier off-time cannot be credited.</p>",v.password);
  httpd_resp_set_type(req,"text/html; charset=utf-8");httpd_resp_set_hdr(req,"Cache-Control","no-store");return httpd_resp_send(req,html,HTTPD_RESP_USE_STRLEN);
 }
 static int hex(char c){return c>='0'&&c<='9'?c-'0':c>='a'&&c<='f'?c-'a'+10:c>='A'&&c<='F'?c-'A'+10:-1;}
@@ -114,7 +114,7 @@ static esp_err_t configure(httpd_req_t *req){
  if(!valid)return httpd_resp_send_err(req,HTTPD_400_BAD_REQUEST,"Check SSID (1-32 bytes) and password (8-63 bytes, or empty for open Wi-Fi)");
  portENTER_CRITICAL(&lock);pending=next;incoming=true;portEXIT_CRITICAL(&lock);memset(&next,0,sizeof(next));
  httpd_resp_set_type(req,"text/html; charset=utf-8");httpd_resp_set_hdr(req,"Cache-Control","no-store");
- return httpd_resp_sendstr(req,"<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><h2>已收到配置</h2><p>请返回设备查看连接与校时结果。连接成功后保存网络，下次开机自动连接。</p>");
+ return httpd_resp_sendstr(req,"<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><h2>Settings received</h2><p>Return to the device to see the connection and sync result. After a successful connection the network is saved and used automatically next boot.</p>");
 }
 static void stop_setup(void){
  if(server){httpd_stop(server);server=NULL;}
