@@ -1,0 +1,881 @@
+"""S19 全流程编排 —— 把 18 个系统串成一局游戏。
+
+对应 docs/systems/S19-orchestration.md。
+
+## 为什么需要它
+
+盘点模块引用关系发现：**8 个模块从未被任何代码调用过** ——
+systems / state / gyms / autosave / intro / opening / transitions / audio
+全是孤岛。它们只被验收平台的 build.py 读参数，
+从没在一次运行里协同过。
+
+`prototype.py` 是唯一的「跑一局」入口，但它只串了
+gameplay + sensing + naming 三个。
+
+后果不是「代码不整洁」，而是**系统之间的接缝从未被走过**：
+时序错了、状态不一致、事件漏派，这些只有真的跑一遍才会暴露。
+
+这个模块就是那一遍。
+
+## 它做什么
+
+    ① 开场：GB 启动动画 → 博士台词 → 选伙伴 → 建档
+    ② 循环：喂扫描数据 → 感知 → 遭遇 → 战斗/捕获 → 收容 → 存档
+    ③ 长线：徽章解锁判定、进化检查、日切结算
+    ④ 收尾：关机存档
+
+每一步都派发 autosave 事件 —— 这是 S18 唯一的接入点，
+不派事件的系统就等于不存档。
+
+## 设计取向
+
+**编排层不含规则**。它只负责调用顺序与事件派发；
+所有判定仍在各自系统里。这样固件移植时可以照抄这个顺序，
+而不用重新推导「先算掉落还是先收容」这类问题。
+
+零第三方依赖，Python 3.9+。
+"""
+
+from __future__ import annotations
+
+import random
+import sys
+from dataclasses import dataclass, field
+from typing import Optional
+
+sys.path.insert(0, __file__.rsplit("/", 1)[0])
+
+import gyms as GY                                       # noqa: E402
+import intro as IN                                      # noqa: E402
+import opening as OP                                    # noqa: E402
+import transitions as TR                                # noqa: E402
+from autosave import AutoSave                           # noqa: E402
+from gameplay import Encounter, PetState, classify_biome  # noqa: E402
+from naming import display_name                         # noqa: E402
+from party import Mon, Party                            # noqa: E402
+from sensing import SensingCore, Scan                   # noqa: E402
+from state import DailyCounters, Dex, DualBufferSave, Inventory, Records, SaveData  # noqa: E402
+from systems import (                                   # noqa: E402
+    BALL_NAME_CN, EXP_ON_CAPTURE, EXP_ON_CARE, EXP_ON_MOTION,
+    CaptureResult, EncounterAccumulator, attempt_capture,
+    auto_battle, check_evolution, consume_ball, do_evolve, exp_progress,
+    exp_to_level, feed_pet, grant_berry, pointer_position, resolve_capture,
+    wild_level, window_width,
+)
+
+# ---------------------------------------------------------------------------
+# 一局游戏的完整状态
+# ---------------------------------------------------------------------------
+
+# 判为「一次访问」所需的连续扫描次数。
+# 10 次 × 30 秒 ≈ 5 分钟 —— 实测这个阈值把访问数从 222 段降到
+# 住宅区 2 / 办公区 19，与直觉相符（一天进出办公区十几次：
+# 会议室、楼层、楼下咖啡）。
+#
+# 阈值太低（≤4）会把抖动算进来；太高（≥20）会漏掉真实的短途访问。
+VISIT_MIN_SCANS = 10
+
+# 野外 biome 判定 —— **未实装，阈值缺实测支撑**。
+#
+# ## 已确证的缺陷
+#
+# `gameplay.classify_biome` 里 `MIN_APS_FOR_BIOME = 4` 先返回 UNKNOWN，
+# 于是它后面的 `if n <= 3: return BIOME_WILD` **数学上不可达**
+# （穷举 AP 数 0~8 验证过：n<4 全 UNKNOWN，n>=4 走后续分支）。
+# 三份真实数据 1061 次扫描里野外出现 **0 次**。
+#
+# 后果：第 1 馆（小刚，野外驻留 1h）与第 5 馆（阿桔，野外 8h）永久锁死，
+# 而道馆是线性的 —— 第 1 馆打不了，八个馆全部不可达。
+# 这是第二个「分支存在 ≠ 会执行」的实例（第一个是交通枢纽要 BLE）。
+#
+# ## 为什么先不修
+#
+# 修法的思路是清楚的：那道 MIN_APS 防护不能拆（它修的是「办公室 17%
+# 扫描误判野外」），要区分「真在空旷处」与「室内但这次扫描不好」
+# 只能靠持续性 —— 与 biome_visits 的确认机制同源。
+#
+# 但**阈值没法凭空定**。我试过两版都不成立：
+#   · 连续 N 次 UNKNOWN → 判不出来。户外 AP 数在阈值 4 附近抖动
+#     （5→3→3→2→5→4→3），连续计数反复归零
+#   · 滑动窗口占比 → 参数只能靠调，而我是在拿合成数据的编造分布调参
+#
+# 缺的是**真实户外采集**：公园、街道、郊野的 AP 数分布到底是什么样。
+# 没有它，WILD_WINDOW / WILD_RATIO 这两个数就是估的 ——
+# 跟第 6 馆「商业区 4 次」那个被标为缺陷的估计值性质完全相同。
+#
+# ## 要做的事
+#
+# ① 用 tools/collector 采一份户外数据（公园/街道各半小时）
+# ② 看 AP 数分布与 family_ratio，定出「空旷」的判据
+# ③ 在 feed_scan 里按持续性实装，并验证真实办公/家数据不被误判成野外
+#
+# 在此之前 feed_scan 保持原行为：UNKNOWN 沿用上次结果。
+
+PHASE_BOOT = "boot"            # GB 启动动画
+PHASE_STORY = "story"          # 博士台词
+PHASE_CHOOSE = "choose"        # 选伙伴
+PHASE_PLAY = "play"            # 日常循环
+PHASE_OVER = "over"            # 关机
+
+
+@dataclass
+class LogEntry:
+    """一条流程日志 —— 验收平台按它渲染时间线。"""
+
+    ts: int
+    kind: str                  # 事件类别
+    text: str                  # 人读的说明
+    detail: dict = field(default_factory=dict)
+
+
+@dataclass
+class Session:
+    """一局游戏。
+
+    这个类持有**全部**可变状态。固件侧对应一个全局结构体 ——
+    刻意不用模块级全局变量，那会让「哪些状态要存档」变得不明确。
+    """
+
+    # 系统实例
+    core: SensingCore = field(default_factory=lambda: SensingCore(only_24g=True))
+    acc: Optional[EncounterAccumulator] = None
+    party: Party = field(default_factory=Party)
+    dex: Dex = field(default_factory=Dex)
+    inventory: Inventory = field(default_factory=Inventory)
+    records: Records = field(default_factory=Records)
+    day: DailyCounters = field(default_factory=DailyCounters)
+    pet: Optional[PetState] = None
+    dual: DualBufferSave = field(default_factory=DualBufferSave)
+    auto: Optional[AutoSave] = None
+
+    # 进度
+    phase: str = PHASE_BOOT
+    badges: int = 0
+    elite_done: bool = False
+    red_done: bool = False
+    day_index: int = 0
+    berry_last_grant: int = 0
+    ts: int = 0
+    # 各 biome 的**访问次数** —— S17 第 6、7 馆用它而非累计驻留。
+    #
+    # 感知层不提供这个（它只管驻留时长），所以在编排层数。
+    # 但**不能简单地「biome 变了就 +1」** —— 实测那样一天能刷出
+    # 野外 103 次、办公区 107 次访问，而实际驻留只有 0.9h / 5.2h。
+    #
+    # 原因：classify_biome 是逐帧判定，边界会抖动。实测 1061 次扫描
+    # 产生 222 个连续段，其中 **66% 只持续 1 次扫描** ——
+    # 那些是抖动，不是真的去了那个地方（日志里能看到 ('野外',1)
+    # ('商业区',1) 反复穿插在办公区中间）。
+    #
+    # 修法与感知层当初修移动误报同源：**瞬时判定不可信，要看持续性**。
+    # 连续 VISIT_MIN_SCANS 次扫描判为同一 biome 才算一次访问。
+    biome_visits: dict = field(default_factory=dict)
+    cand_biome: str = ""            # 候选 biome（还没确认成访问）
+    cand_count: int = 0
+    confirmed_biome: str = ""       # 已确认的当前 biome
+    # 「可以进化 / 可以挑战」的去重标记 —— 这两个条件一旦满足会一直满足，
+    # 每次 check_progress 都播报会刷屏（实测 30 天 245 条重复）。
+    # 只在状态翻转时说一次。
+    evolve_announced: bool = False
+    gym_announced: int = 0          # 已播报的馆序号（换馆要能重新播报）
+
+    # 日志
+    log: list = field(default_factory=list)
+
+    def say(self, kind: str, text: str, **detail) -> None:
+        self.log.append(LogEntry(ts=self.ts, kind=kind, text=text,
+                                 detail=detail))
+
+    # -- 存档数据视图 -------------------------------------------------------
+
+    def snapshot(self) -> SaveData:
+        """当前状态打包成 SaveData。
+
+        注意 pet_* 字段与 party[0] 的关系：**party[0] 是权威**，
+        pet_* 只是它的镜像 + 三条轴。每次快照都从 party[0] 重新取，
+        避免两者漂移（S14 的设计要点）。
+        """
+        sd = SaveData()
+        leader = self.party.leader
+        if leader:
+            sd.pet_species = leader.species_id
+            sd.pet_level = leader.level
+            sd.pet_hp = leader.hp
+            sd.nickname_idx = leader.nickname_idx
+        if self.pet:
+            sd.satiety = int(self.pet.satiety)
+            sd.mood = int(self.pet.mood)
+            sd.stamina = int(self.pet.stamina)
+            sd.intimacy = int(self.pet.intimacy)
+            sd.explore_value = self.pet.explore_value
+        sd.dex = self.dex
+        sd.inventory = self.inventory
+        sd.records = self.records
+        sd.party = self.party
+        sd.day_index = self.day_index
+        sd.biome_dwell = [self.core.memory.biome_dwell.get(b, 0)
+                          for b in ("野外", "住宅区", "办公区", "商业区",
+                                    "交通枢纽")]
+        return sd
+
+    def fire(self, event: str) -> bool:
+        """派发存档事件。**每个改变状态的动作都要调它** ——
+        不派事件的系统就等于不存档（S18）。"""
+        if not self.auto:
+            return False
+        return self.auto.on_event(event, self.ts, self.snapshot())
+
+
+# ---------------------------------------------------------------------------
+# ① 开场
+# ---------------------------------------------------------------------------
+
+def run_intro(s: Session, choice: int = 3, skip_story: bool = False) -> None:
+    """开场三段：启动动画 → 台词 → 选伙伴。
+
+    choice 是 IN.STARTERS 的下标（默认 3 = 皮卡丘）。
+    """
+    boot = IN.boot_sequence()
+    sounds = [f.step for f in boot if f.sound]
+    s.say("boot", f"GB 启动动画 {len(boot)} 帧，音效在第 {sounds} 步落定",
+          frames=len(boot), sounds=sounds)
+
+    s.phase = PHASE_STORY
+    if skip_story:
+        s.say("story", "跳过台词（C 键）")
+    else:
+        flow = OP.OpeningFlow()
+        for i, box in enumerate(OP.SCRIPT):
+            s.say("story", " / ".join(box.lines), box=i + 1)
+        s.say("story", f"共 {len(OP.SCRIPT)} 框 "
+                       f"{OP.total_frames() / 30:.1f} 秒")
+
+    s.phase = PHASE_CHOOSE
+    st = IN.STARTERS[choice]
+    init = IN.apply_choice(choice)
+
+    # 建档：伙伴入队伍 + 三条轴起点 + 初始道具 + 图鉴
+    mon = Mon(species_id=init["pet_species"], level=init["pet_level"],
+              hp=100, nickname_idx=init["nickname_idx"])
+    s.party.receive(mon)
+    s.pet = PetState(species_id=mon.species_id, type_name=init["pet_type"],
+                     satiety=float(init["satiety"]), mood=float(init["mood"]),
+                     stamina=float(init["stamina"]))
+    s.pet.advance(s.ts)                      # 立时间基准
+    for k, v in init["items"].items():
+        setattr(s.inventory, k, v)
+    for sid in init["dex_caught"]:
+        s.dex.mark_caught(sid)
+
+    s.acc = EncounterAccumulator(stats_sum=_stats_sum())
+    s.auto = AutoSave(s.dual)
+    s.auto.last_periodic_ts = s.ts
+    s.auto.last_write_ts = s.ts
+
+    s.say("choose", f"选定 {st['zh']}（{st['type']}系 Lv{mon.level}）",
+          species=mon.species_id)
+    s.fire("starter_chosen")                 # 存档的诞生
+    s.phase = PHASE_PLAY
+
+
+_STATS_CACHE: dict = {}
+
+
+def _stats_sum() -> dict:
+    """151 只的种族值总和 —— species_pool 分档要用。
+
+    从 assets/gen1.bin 读（入库产物），不依赖 /tmp 中间文件 ——
+    那个教训见 convert_font.py 的注释。
+    """
+    if _STATS_CACHE:
+        return _STATS_CACHE
+    import pathlib
+    import struct
+    p = pathlib.Path(__file__).resolve().parent.parent / "assets" / "gen1.bin"
+    if not p.exists():
+        # 没有资产时给个均匀分布，让流程仍能跑
+        return {i: 300 for i in range(1, 152)}
+    d = p.read_bytes()
+    magic, ver, rsz, cnt, poolsz = struct.unpack("<4sHHII", d[:16])
+    recs = d[16:16 + cnt * rsz]
+    for i in range(cnt):
+        o = i * rsz
+        hp, at, df, sp, spd = struct.unpack("<BBBBB", recs[o + 9:o + 14])
+        _STATS_CACHE[i + 1] = hp + at + df + sp + spd
+    return _STATS_CACHE
+
+
+# ---------------------------------------------------------------------------
+# ② 日常循环
+# ---------------------------------------------------------------------------
+
+def feed_scan(s: Session, scan: Scan) -> None:
+    """喂一次扫描。这是整个游戏的心跳。
+
+    顺序照固件的实际流程：
+      感知 → 遭遇累积 → 三条轴推进 → 浆果产出 → 存档 tick
+    """
+    s.ts = scan.ts
+    res = s.core.feed(scan)
+    # biome 要自己算 —— SensingResult 不含它（感知层只管「这是哪」，
+    # 不管「这是什么地方」）。第一次串联就撞在这个假设上。
+    band = scan.only_24g()
+    raw_biome = classify_biome(band.aps)
+    # BIOME_UNKNOWN（AP 太少判不了）→ 沿用上次结果。
+    # 这是 classify_biome 的契约：它宁可说「不知道」也不猜。
+    #
+    # ⚠️ 这一行同时也是「野外 biome 永不出现」的原因 ——
+    # classify_biome 的野外分支不可达（死代码），而真实户外的低 AP 扫描
+    # 全被这里吃成「沿用室内结果」。第 1、5 馆因此锁死。
+    # 修法与缺的实测数据见文件顶部 WILD_* 那段说明。
+    biome = raw_biome or s.confirmed_biome or s.cand_biome
+
+    # 三条轴：advance 只需要「过了多久」（S4）
+    #
+    # advance() 的 motion_events 只用于算体能消耗，**不加探索值** ——
+    # 加探索值的是 pet.on_motion_event()，而它原先全项目只有 prototype.py
+    # 调过一次，编排层从不调用。后果：探索值恒为 0，而 S7 进化要
+    # 「探索值 ≥ 10」，于是**进化在完整流程里永久不可达**
+    # （30 天跑下来主宠还是初始形态，check_evolution 一直返回
+    #  「探索值不足（0/10）」）。
+    #
+    # 同 Inventory.use() 那条：文档写了规则，代码只实现一半。
+    if s.pet:
+        moving = res.state == "moving"
+        s.pet.advance(scan.ts, motion_events=1 if moving else 0)
+        if moving:
+            s.pet.on_motion_event()
+            grant_exp(s, EXP_ON_MOTION, "探索")
+
+    # 浆果：驻留时按时间产出（S9）
+    if res.state == "staying":
+        dwell = sum(s.core.memory.biome_dwell.values())
+        s.berry_last_grant, got = grant_berry(s.inventory, dwell,
+                                              s.berry_last_grant)
+        if got:
+            s.say("item", f"驻留产出浆果 ×{got}")
+            s.fire("item_drop")
+
+    # biome 访问计数 —— 要连续 VISIT_MIN_SCANS 次才算，见 Session 的注释
+    if biome:
+        if biome == s.cand_biome:
+            s.cand_count += 1
+        else:
+            s.cand_biome, s.cand_count = biome, 1
+        if (s.cand_count >= VISIT_MIN_SCANS
+                and s.cand_biome != s.confirmed_biome):
+            s.confirmed_biome = s.cand_biome
+            s.biome_visits[s.cand_biome] = \
+                s.biome_visits.get(s.cand_biome, 0) + 1
+            s.say("biome", f"进入{s.cand_biome}"
+                           f"（连续 {s.cand_count} 次扫描确认）")
+
+    if res.is_new_place:
+        s.day.new_places += 1
+        # 心情加成 —— on_new_place() 原先也没被编排层调用（同 on_motion_event）。
+        # 漏了它，「去了新地方会开心」这条设计在完整流程里不存在：
+        # 心情只会被时间衰减和照料抬升，探索对它毫无影响。
+        # 而 S4 的立意正是「让探索反哺养成」（docs/04-gameplay.md）。
+        if s.pet:
+            s.pet.on_new_place()
+        s.say("place", f"发现新地点（{biome}）", biome=biome)
+        s.fire("place")
+
+    if res.state == "moving":
+        s.day.motion_events += 1
+        s.fire("motion")
+
+    # 遭遇
+    if s.acc and s.pet:
+        before = len(s.acc.queue.items)
+        s.acc.feed(res, scan.only_24g(), s.pet)
+        if len(s.acc.queue.items) > before:
+            qe = s.acc.queue.items[-1]
+            s.records.on_encounter(qe.enc.biome, qe.rarity, qe.is_shiny, s.day)
+            tag = "✦闪光 " if qe.is_shiny else ""
+            s.say("encounter",
+                  f"{tag}遭遇 #{qe.species_id} "
+                  f"{'★' * qe.rarity} @{qe.enc.biome}",
+                  species=qe.species_id, rarity=qe.rarity,
+                  shiny=qe.is_shiny)
+            if qe.is_shiny:
+                s.dex.mark_seen(qe.species_id, shiny=True)
+                s.fire("shiny_seen")         # 立即存 —— 那份运气不能丢
+            else:
+                s.fire("encounter")
+
+    if s.auto:
+        s.auto.tick(s.ts, s.snapshot())
+
+
+def handle_encounter(s: Session, index: int = 0, do_battle: bool = True,
+                     ball: str = "poke", press_offset_ms: int = 0) -> dict:
+    """处理队列里第 index 条遭遇：转场 → 战斗 → 投球 → 收容。
+
+    这是玩家的一次完整交互（30 秒会话的核心）。
+    """
+    if not s.acc or not s.acc.queue.items or not s.pet:
+        return {"ok": False, "why": "队列是空的"}
+    if not (0 <= index < len(s.acc.queue.items)):
+        return {"ok": False, "why": "越界"}
+
+    qe = s.acc.queue.items[index]
+    leader = s.party.leader
+    lv = wild_level(qe.rarity, leader.level if leader else 5)
+
+    # 转场：确定性选择（S15）—— 玩家能从转场认出对手强弱
+    tr_name, tr_idx = TR.pick_transition(
+        is_trainer=False, wild_level=lv,
+        pet_level=leader.level if leader else 5, biome=qe.enc.biome)
+    s.say("transition",
+          f"转场「{TR.TRANSITIONS[tr_name]['zh']}」"
+          f"（{TR.TRANSITIONS[tr_name]['frames']} 帧，bits={tr_idx:03b}）",
+          name=tr_name)
+
+    out = {"species": qe.species_id, "rarity": qe.rarity, "level": lv,
+           "shiny": qe.is_shiny, "transition": tr_name}
+
+    # 战斗（可选）—— 打残后捕获窗口加宽（S3 的削弱机制）
+    if do_battle and leader:
+        mons = _stats_sum()
+        pet_stats = _base_stats(leader.species_id)
+        wild_stats = _base_stats(qe.species_id)
+        b = auto_battle([s.pet.type_name], pet_stats, leader.level,
+                        [_type_of(qe.species_id)], wild_stats, lv,
+                        s.pet.ability_factor,
+                        pet_species=leader.species_id,
+                        wild_species=qe.species_id,
+                        # 战斗要可回放：种子由「这次遭遇」决定而非全局随机源，
+                        # 同一份扫描数据重跑得到同一场战斗（同 spawn_seed 取向）
+                        seed=(qe.species_id << 16) ^ (s.ts & 0xFFFF))
+        qe.hp_ratio = b.wild_hp_ratio
+        # 主宠用的最后一招 —— 给日志与 P3 的「效果绝佳」提示用
+        pm = [r for r in b.rounds if r.attacker == "pet" and r.move]
+        mv_note = f"，{pm[-1].move}" if pm else ""
+        out["battle"] = {"won": b.won, "rounds": len(b.rounds),
+                         "wild_hp": b.wild_hp_ratio, "exp": b.exp,
+                         "moves": [r.move for r in pm]}
+        s.say("battle",
+              f"战斗 {len(b.rounds)} 回合 → {'胜' if b.won else '败'}"
+              f"，野怪 HP {b.wild_hp_ratio}%（+{b.exp} exp{mv_note}）",
+              won=b.won, rounds=len(b.rounds), exp=b.exp,
+              wild_hp=b.wild_hp_ratio,
+              moves=[r.move for r in pm])
+        # b.exp 原先算好了却没人接收 —— 与 on_motion_event 同一形状的缺陷。
+        # 败也给经验（打了就有长进），只是比胜少 20。
+        grant_exp(s, b.exp, "战斗" + ("胜利" if b.won else ""))
+        s.fire("battle")
+
+    # 投球：**先扣球再判定**（S9）—— 投出去的球无论命中都消耗掉了
+    if not consume_ball(s.inventory, ball):
+        out["ok"] = False
+        out["why"] = f"没有{BALL_NAME_CN.get(ball, ball)}了"
+        s.say("capture", out["why"])
+        return out
+
+    cap_rate = _capture_rate(qe.species_id)
+    w = window_width(cap_rate, s.pet.catch_window_bonus, ball, qe.hp_ratio)
+    ptr = pointer_position(press_offset_ms)
+    cap = attempt_capture(qe, cap_rate, s.pet, ball, press_offset_ms)
+
+    o = resolve_capture(qe, cap, s.party, s.dex, s.inventory, level=lv,
+                        is_new_place=False)
+    out["window"] = w
+    out["pointer"] = ptr
+    out["caught"] = cap.caught
+    out["stored"] = o.stored
+    out["drops"] = o.drops
+
+    if cap.caught and o.stored:
+        s.records.on_capture(qe.species_id, qe.rarity, qe.is_shiny, s.day)
+        s.say("capture",
+              f"捕获 #{qe.species_id} Lv{lv} → {o.where}"
+              f"{'（图鉴首次）' if o.dex_new else ''}")
+        grant_exp(s, EXP_ON_CAPTURE, "捕获")
+        s.fire("capture")                    # 立即存
+    elif cap.caught and not o.stored:
+        s.say("capture", f"抓到了但收容失败：{o.store_note}")
+    else:
+        s.say("capture", f"未命中（指针 {ptr}，窗口 {w}px）"
+                         f"{'，跑掉了' if cap.fled else ''}")
+
+    if o.drops:
+        s.say("item", f"掉落 {o.drops}")
+
+    # 出队
+    s.acc.queue.items.pop(index)
+    return out
+
+
+def care(s: Session, action: str = "feed") -> dict:
+    """照料 —— 喂食消耗浆果（S9 + S4 的衔接）。"""
+    if not s.pet:
+        return {"ok": False, "why": "还没有伙伴"}
+    if action == "feed":
+        ok, why = feed_pet(s.inventory, s.pet)
+    elif action == "play":
+        s.pet.play()
+        ok, why = True, "玩耍完成"
+    elif action == "rest":
+        s.pet.rest()
+        ok, why = True, "休息完成"
+    else:
+        return {"ok": False, "why": "未知动作"}
+
+    if ok:
+        s.day.cared = True
+        s.say("care", f"{action} → 饱食{s.pet.satiety:.0f} "
+                      f"心情{s.pet.mood:.0f} 体能{s.pet.stamina:.0f}")
+        grant_exp(s, EXP_ON_CARE, "照料")
+        s.fire("care")
+    else:
+        s.say("care", why)
+    return {"ok": ok, "why": why}
+
+
+def grant_exp(s: Session, amount: int, why: str) -> dict:
+    """给主宠加经验，必要时升级。**升级的唯一入口。**
+
+    只给队首（主宠）—— 仓库里的宝可梦状态冻结，与 S14 让三条轴
+    只跟队首走是同一条取向：这台设备养的是一只，不是六只。
+
+    等级上限取 `gyms.level_cap(badges)`：徽章真的限制成长，
+    而不只是一个显示用的数字。原版那套「没徽章的宝可梦不听话」
+    在三键设备上没法表达（要额外的提示与失败反馈），简化成硬上限。
+
+    返回 {"gained", "level_up", "from", "to"} —— 给 UI 画升级动画用。
+    """
+    leader = s.party.leader
+    if not leader or amount <= 0:
+        return {"gained": 0, "level_up": False}
+
+    cap = GY.level_cap(s.badges)
+    before = leader.level
+    leader.exp += amount
+    after = exp_to_level(leader.exp, cap)
+
+    out = {"gained": amount, "level_up": after > before,
+           "from": before, "to": after, "why": why}
+    if after > before:
+        leader.level = after
+        got, need = exp_progress(leader.exp, after)
+        s.say("level", f"升级！Lv{before} → Lv{after}（{why}）",
+              frm=before, to=after, exp=leader.exp)
+        s.fire("level_up")
+        # 撞到徽章上限时说清楚 —— 否则玩家只看到经验涨而等级不动
+        if after >= cap:
+            s.say("level", f"已达当前等级上限 Lv{cap}"
+                           f"（需要第 {s.badges + 1} 枚徽章）")
+    return out
+
+
+def check_progress(s: Session) -> dict:
+    """长线判定：进化条件 + 徽章解锁。
+
+    这两件事都是「攒够了才告诉玩家」，所以每次交互后检查一次，
+    而不是等玩家去某个页面查。
+    """
+    out: dict = {"evolve": None, "gym": None}
+
+    # 进化（S7）
+    leader = s.party.leader
+    if leader and s.pet:
+        info = _evo_info(leader.species_id)
+        if info["to"]:
+            c = check_evolution(s.pet, info["trigger"], info["to"],
+                                info["level"],
+                                biome_dwell=s.core.memory.biome_dwell,
+                                item_hint=info["stone"])
+            out["evolve"] = {"can": c.can, "why": c.reason,
+                             "to": info["to"]}
+            # 只在**状态翻转时**说一次。check_progress 每次遭遇后都调，
+            # 条件一旦满足就会一直满足 —— 原先每次都 say，30 天刷出
+            # 245 条重复的「可以进化」，把时间线冲得没法看。
+            #
+            # 这与 P7 文档记的「首周纪录刷屏」是同一类问题：
+            # 持续为真的状态不该每帧播报。
+            if c.can and not s.evolve_announced:
+                s.say("evolve", f"可以进化 → #{info['to']}（{c.reason}）")
+                s.evolve_announced = True
+            elif not c.can:
+                s.evolve_announced = False
+
+    # 徽章（S17）
+    if s.badges < len(GY.GYMS):
+        g = GY.GYMS[s.badges]
+        c = GY.check_gym(g, s.badges, s.core.memory.biome_dwell,
+                         s.records.total_encounters, s.dex.count("seen"),
+                         biome_visits=s.biome_visits,
+                         place_count=len(s.core.memory.places))
+        out["gym"] = {"order": g.order, "leader": g.leader,
+                      "can": c.can, "why": c.reason,
+                      "progress": c.progress}
+        if c.can:
+            # 同 evolve：只在翻转时说一次，且换馆后要能重新说
+            # （s.badges 变了就是换了一个馆，用它当去重键）。
+            if s.gym_announced != g.order:
+                s.say("gym", f"可以挑战{g.leader}（{g.badge}）")
+                s.gym_announced = g.order
+        elif s.gym_announced == g.order:
+            s.gym_announced = 0
+    return out
+
+
+def challenge_gym(s: Session) -> dict:
+    """挑战当前可打的道馆。
+
+    简化：不逐只模拟对战，用队伍最强等级 vs 馆主最强等级判定。
+    完整对战要等固件侧的 UI，而那不影响这里要验证的**串联**。
+    """
+    if s.badges >= len(GY.GYMS):
+        return {"ok": False, "why": "八馆已通关"}
+    g = GY.GYMS[s.badges]
+    c = GY.check_gym(g, s.badges, s.core.memory.biome_dwell,
+                     s.records.total_encounters, s.dex.count("seen"),
+                     biome_visits=s.biome_visits,
+                     place_count=len(s.core.memory.places))
+    if not c.can:
+        return {"ok": False, "why": c.reason, "progress": c.progress}
+
+    strongest = s.party.strongest()
+    my_lv = strongest.level if strongest else 5
+    boss_lv = max(l for _, l in g.team)
+    cap = GY.level_cap(s.badges)
+
+    # 等级上限：超过的不听指挥（S17）
+    usable = [m for m in s.party.party if m.level <= cap]
+    if not usable:
+        return {"ok": False,
+                "why": f"队伍里没有 Lv{cap} 以下的（超过上限不听指挥）"}
+
+    won = my_lv >= boss_lv - 6          # 留一点属性相克的余量
+    if won:
+        s.badges += 1
+        s.say("gym", f"击败{g.leader}，取得{g.badge}！"
+                     f"等级上限 → Lv{g.level_cap}")
+        s.fire("badge")                  # 立即存
+    else:
+        s.say("gym", f"挑战{g.leader}失败（我方 Lv{my_lv} vs Lv{boss_lv}）")
+    return {"ok": won, "badge": g.badge if won else None,
+            "my_level": my_lv, "boss_level": boss_lv}
+
+
+def roll_day(s: Session) -> dict:
+    """日切结算（S10）。"""
+    s.day_index += 1
+    broken = s.records.roll_day(s.day_index, s.day,
+                               s.pet.intimacy if s.pet else 0)
+    ms = s.records.milestone()
+    if ms and s.pet:
+        s.pet.mood = min(100.0, s.pet.mood + 8.0)
+    s.say("day", f"第 {s.day_index} 天结算："
+                 f"遭遇{s.day.encounters} 捕获{s.day.captures} "
+                 f"移动{s.day.motion_events}"
+                 + (f"　打破纪录 {broken}" if broken else "")
+                 + (f"　里程碑 {ms} 天" if ms else ""))
+    s.day = DailyCounters()
+    s.fire("care")            # 日切算延迟事件
+    return {"day": s.day_index, "broken": broken, "milestone": ms}
+
+
+def shutdown(s: Session) -> dict:
+    """关机 —— 必存（S18）。"""
+    s.phase = PHASE_OVER
+    s.fire("sleep")
+    blob, src = s.dual.load()
+    s.say("save", f"关机存档　读回验证：{src}　"
+                  f"{len(blob) if blob else 0} B")
+    return {"src": src, "bytes": len(blob) if blob else 0,
+            "writes": s.auto.stats.writes if s.auto else 0}
+
+
+# ---------------------------------------------------------------------------
+# 物种数据查询 —— 从 assets/gen1.bin 读
+# ---------------------------------------------------------------------------
+
+_MON_CACHE: dict = {}
+
+TYPES_CN = ["一般", "火", "水", "电", "草", "冰", "格斗", "毒",
+            "地面", "飞行", "超能", "虫", "岩石", "幽灵", "龙"]
+_STONES = {26: "thunder-stone", 36: "moon-stone", 40: "moon-stone",
+           38: "fire-stone", 78: "fire-stone", 59: "fire-stone",
+           62: "water-stone", 73: "water-stone", 87: "water-stone",
+           91: "water-stone", 121: "water-stone", 134: "water-stone",
+           135: "thunder-stone", 136: "fire-stone",
+           45: "leaf-stone", 71: "leaf-stone", 103: "leaf-stone"}
+
+
+def _load_mons() -> dict:
+    if _MON_CACHE:
+        return _MON_CACHE
+    import pathlib
+    import struct
+    p = pathlib.Path(__file__).resolve().parent.parent / "assets" / "gen1.bin"
+    if not p.exists():
+        return {}
+    d = p.read_bytes()
+    magic, ver, rsz, cnt, poolsz = struct.unpack("<4sHHII", d[:16])
+    recs = d[16:16 + cnt * rsz]
+    for i in range(cnt):
+        o = i * rsz
+        (off, ln, t1, t2, bm, cr, tg, ev, el,
+         hp, at, df, sp, spd) = struct.unpack("<HBBBBBBBBBBBBB",
+                                              recs[o:o + 15])
+        _MON_CACHE[i + 1] = {
+            "t1": TYPES_CN[t1] if t1 < 15 else "一般",
+            "catch": cr, "trigger": tg, "evo": ev, "evo_level": el,
+            "stats": [hp, at, df, sp, spd],
+        }
+    return _MON_CACHE
+
+
+def _base_stats(sid: int) -> list:
+    m = _load_mons().get(sid)
+    return m["stats"] if m else [50, 50, 50, 50, 50]
+
+
+def _type_of(sid: int) -> str:
+    m = _load_mons().get(sid)
+    return m["t1"] if m else "一般"
+
+
+def _capture_rate(sid: int) -> int:
+    m = _load_mons().get(sid)
+    return m["catch"] if m else 100
+
+
+def _evo_info(sid: int) -> dict:
+    m = _load_mons().get(sid, {})
+    return {"to": m.get("evo", 0), "trigger": m.get("trigger", 0xFF),
+            "level": m.get("evo_level", 0),
+            "stone": _STONES.get(m.get("evo", 0), "fire-stone")}
+
+
+# ---------------------------------------------------------------------------
+# 一键跑通：给验收平台与回归测试用
+# ---------------------------------------------------------------------------
+
+# ⚠️ 等级永不增长 —— **全项目没有任何经验值/升级机制**。
+#
+# grep exp / gain_exp / level_up / level += 在 sim/ 下零命中。
+# 主宠从 run_intro 拿到 Lv5，30 天跑下来还是 Lv5。
+#
+# 这不是「还没做的功能」，是**已写进设计的机制缺了实现**：
+#   · docs/systems/S3-battle.md 明确写「练到 Lv30 能回头收拾 ★★★★」，
+#     并列了火系御三家「小火龙→火恐龙→喷火龙」的成长曲线表
+#   · sim/strings.py 的 P3 文案有「经验」标签、P5 有「等级」
+#   · systems.effective_stat(base, level) 按等级算能力值
+#   · systems.wild_level(rarity, pet_level) 让野怪等级跟主宠联动
+#   · gyms.level_cap(badges) 用徽章解锁等级上限
+#   · S7 的 evolve_level 是等级触发的进化条件
+# 这六处全都假设等级会涨。等级恒定 Lv5 让它们同时失去意义：
+# 野怪等级永远按 Lv5 生成、徽章上限永远用不到、等级触发的进化永远不达。
+#
+# **不在这里顺手实现** —— 经验曲线是玩法设计决策（打一场给多少、
+# 稀有度加权多少、要不要跟 level_cap 联动、升级要不要回满 HP），
+# 定错了会连带影响战斗胜率、捕获窗口、道馆门槛三条链路。
+# 需要先定曲线再实现，那是 S3/S4 的设计工作，不是编排层的接线工作。
+#
+# 现有的 auto_battle() 返回 BattleResult 但**不含经验字段** ——
+# 实现时的第一步是给它加，然后在 handle_encounter 的战斗分支里结算。
+
+
+def play_through(scans: list, choice: int = 3, auto_capture: bool = True,
+                 care_hours: tuple = (8, 13, 21),
+                 press_offset_ms: int = 600, press_jitter_ms: int = 0,
+                 seed: int = 42) -> Session:
+    """喂一串真实扫描数据，跑完整局。
+
+    这是**唯一一处**会让 18 个系统同时工作的地方 ——
+    也就是系统之间的接缝唯一会被走到的地方。
+
+    ## press_offset_ms 为什么要能调
+
+    原先写死 600 —— 而指针周期正好 1200ms（`systems.POINTER_PERIOD_MS`），
+    600 是半周期，即三角波**顶点**，指针恒等于 200。窗口居中在 ~120，
+    于是除了开局窗口特别宽的头两次，之后 112 次投球全部未命中。
+
+    表现是「30 天 325 次遭遇只抓到 3 只、0 枚徽章」，看起来像玩法失衡，
+    实际是**测量方式**的问题：固定按键时机不代表玩家，它代表一个
+    每次都按在同一相位的机器人，而那个相位恰好是最差的。
+
+    所以：
+      · press_offset_ms  —— 按键时机（0~周期）。想测「完美玩家」传半窗口中心
+      · press_jitter_ms  —— 时机抖动，>0 时每次在 ±jitter 内随机偏移。
+                            这才接近真人：人会瞄准但手不稳。
+      · seed             —— 抖动的随机种子，保证可复现
+    """
+    rng = random.Random(seed)
+    s = Session()
+    if scans:
+        s.ts = scans[0].ts
+    run_intro(s, choice=choice, skip_story=True)
+
+    last_day = -1
+    cared_this_hour = set()
+    for sc in scans:
+        feed_scan(s, sc)
+
+        # 玩家行为：有遭遇就处理（模拟玩家掏出设备）
+        if auto_capture and s.acc and s.acc.queue.items:
+            off = press_offset_ms
+            if press_jitter_ms:
+                off += rng.randint(-press_jitter_ms, press_jitter_ms)
+            handle_encounter(s, 0, do_battle=True, press_offset_ms=off)
+            check_progress(s)
+            # 够条件就挑战道馆
+            r = challenge_gym(s)
+            if r.get("ok"):
+                check_progress(s)
+
+        # 照料：每天三次
+        h = (sc.ts // 3600) % 24
+        key = (sc.ts // 86400, h)
+        if h in care_hours and key not in cared_this_hour:
+            cared_this_hour.add(key)
+            care(s, "feed")
+
+        # 日切
+        d = sc.ts // 86400
+        if last_day >= 0 and d != last_day:
+            roll_day(s)
+        last_day = d
+
+    shutdown(s)
+    return s
+
+
+def summary(s: Session) -> dict:
+    """一局的结果概览。"""
+    prog = GY.progress_summary(s.badges, s.elite_done, s.red_done)
+    leader = s.party.leader
+    return {
+        "phase": s.phase,
+        "days": s.day_index,
+        "leader": (display_name(leader.nickname_idx, f"#{leader.species_id}")
+                   if leader else None),
+        "leader_level": leader.level if leader else 0,
+        "party": len(s.party.party),
+        "box": len(s.party.box),
+        "caught": s.dex.count("caught"),
+        "seen": s.dex.count("seen"),
+        "shiny": s.dex.count("shiny_caught"),
+        "badges": s.badges,
+        "stage": prog["stage"],
+        "level_cap": prog["level_cap"],
+        "encounters": s.records.total_encounters,
+        "captures": s.records.total_captures,
+        "items": {"poke": s.inventory.poke, "great": s.inventory.great,
+                  "ultra": s.inventory.ultra, "berry": s.inventory.berry},
+        "saves": s.auto.stats.writes if s.auto else 0,
+        "save_detail": (dict(s.auto.stats.by_reason) if s.auto else {}),
+        "log_entries": len(s.log),
+        "biome_visits": dict(s.biome_visits),
+        "biome_dwell_h": {k: round(v / 3600, 1)
+                          for k, v in s.core.memory.biome_dwell.items()},
+        "pet": ({"satiety": round(s.pet.satiety, 1),
+                 "mood": round(s.pet.mood, 1),
+                 "stamina": round(s.pet.stamina, 1),
+                 "intimacy": round(s.pet.intimacy, 1),
+                 "despondent": s.pet.is_despondent} if s.pet else None),
+    }

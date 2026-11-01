@@ -1,0 +1,150 @@
+#!/usr/bin/env python3
+"""Protocol, browser decoder, restore safety and checkpoint regression; no device writes."""
+from pathlib import Path
+import importlib.util
+import json
+import shutil
+import subprocess
+import tempfile
+import struct
+ROOT=Path(__file__).resolve().parents[2]
+C=r'''
+#include "usb_backup.h"
+#include "save.h"
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+static bool deny_allocation;
+static void *backup_test_malloc(size_t n){return deny_allocation?NULL:malloc(n);}
+#define malloc backup_test_malloc
+#include "usb_backup.c"
+#undef malloc
+static unsigned test_schema=SAVE_VERSION;
+static char transcript[70000];static int reads;static bool readable=true;
+static unsigned data_count;static uint32_t previous_data_ms;
+static void emit(const char *s){if(!strncmp(s,"!PWBACKUP DATA ",15)){if(data_count)assert((uint32_t)(now-previous_data_ms)>=20);previous_data_ms=now;data_count++;}assert(strlen(transcript)+strlen(s)<sizeof(transcript));strcat(transcript,s);}
+static bool snapshot(uint8_t *out,size_t size){reads++;for(unsigned i=0;i<size;i++)out[i]=i;return readable;}
+static void feed(const char *s){while(*s)assert(usb_backup_feed(*s++));}
+static void init(void){transcript[0]=0;reads=0;readable=true;data_count=0;usb_backup_init(snapshot,emit,"001122334455","1111111111111111111111111111111111111111111111111111111111111111",test_schema);}
+static const char *hello="!PWBACKUP HELLO 0123456789abcdef0123456789abcdef\n";
+int main(int argc,char **argv){
+ if(argc==2)test_schema=(unsigned)strtoul(argv[1],NULL,10);
+ init();usb_backup_request();assert(usb_backup_state()==USB_BACKUP_NO_HOST&&reads==0);
+ assert(!usb_backup_feed('a'));feed("!bad acg\n");assert(reads==0);
+ char huge[301];memset(huge,'a',sizeof(huge));huge[0]='!';huge[299]='\n';huge[300]=0;feed(huge);assert(!usb_backup_feed('b'));
+ feed(hello);assert(strstr(transcript,"READY"));assert(reads==0); // host cannot start a backup
+ usb_backup_tick(16000);usb_backup_request();assert(reads==0);
+ feed(hello);deny_allocation=true;usb_backup_request();assert(usb_backup_state()==USB_BACKUP_FAILED&&reads==0&&strstr(transcript,"ERROR MEMORY"));
+ deny_allocation=false;readable=false;usb_backup_request();assert(usb_backup_state()==USB_BACKUP_FAILED&&strstr(transcript,"ERROR SNAPSHOT"));
+ readable=true;usb_backup_request();assert(usb_backup_state()==USB_BACKUP_SENDING);
+ feed("!PWBACKUP ACK 0123456789abcdef0123456789abcdef 1\n");assert(usb_backup_state()==USB_BACKUP_SENDING);
+ usb_backup_tick(32000);assert(usb_backup_state()==USB_BACKUP_FAILED); // disconnected host
+ init();feed(hello);usb_backup_request();usb_backup_request();assert(reads==1);
+ for(unsigned i=0;i<192;i++){for(unsigned j=0;j<100;j++)usb_backup_tick(i*20);assert(data_count==i+1);}
+ assert(usb_backup_state()==USB_BACKUP_WAIT_ACK);
+ feed("!PWBACKUP ACK ffffffffffffffffffffffffffffffff 1\n");assert(usb_backup_state()==USB_BACKUP_WAIT_ACK);
+ feed("!PWBACKUP ACK 0123456789abcdef0123456789abcdef 2\n");assert(usb_backup_state()==USB_BACKUP_WAIT_ACK);
+ feed("!PWBACKUP ACK 0123456789abcdef0123456789abcdef 1\n");assert(usb_backup_state()==USB_BACKUP_DONE);
+ puts(transcript);
+ usb_backup_request();assert(usb_backup_state()==USB_BACKUP_SENDING);
+ feed("!PWBACKUP BYE 0123456789abcdef0123456789abcdef\n");assert(usb_backup_state()==USB_BACKUP_FAILED);
+ init();feed(hello);usb_backup_request();for(unsigned i=0;i<192;i++)usb_backup_tick(i*20);
+ usb_backup_tick(61000);assert(usb_backup_state()==USB_BACKUP_FAILED); // no disk ACK
+ return 0;
+}
+'''
+JS=r'''
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {webcrypto} from 'node:crypto';
+const {Receiver,envelope,crc32,decodeBackup,validSaveVersion}=await import(process.argv[2]);
+const lines=readFileSync(process.argv[3],'utf8').split('\n');
+function replay(xs){const r=new Receiver('0123456789abcdef0123456789abcdef');let last;for(const x of xs){let v=r.accept(x);if(v?.complete)last=v.complete;}return last;}
+const q=replay(lines);assert(q);assert.equal(q.bytes.length,24576);assert.equal(q.bytes[2049],1);
+const file=await envelope(q,webcrypto);const schema=Number(process.argv[5]??readFileSync(process.argv[4],'utf8').match(/#define SAVE_VERSION (\d+)/)[1]);
+assert.equal(file.save_version,schema);
+for(const version of [1,15,16,17,18,99,1000,65535]){
+ const wire=lines.map(x=>x.startsWith('!PWBACKUP BEGIN ')?x.replace(/ \d+ 36864 24576 /,` ${version} 36864 24576 `):x);
+ const item=await envelope(replay(wire),webcrypto);
+ assert.equal(item.save_version,version);
+ assert.equal((await decodeBackup(JSON.stringify(item),webcrypto)).metadata.save_version,version);
+}
+assert(validSaveVersion(schema),'Firmware schema must fit the protocol uint16 version field');
+for(const version of [0,-1,65536,1.5,'17',null,true]){
+ await assert.rejects(()=>decodeBackup(JSON.stringify({...file,save_version:version}),webcrypto));
+}
+for(const version of ['0','-1','65536','017','1.5','1e2']){
+ assert.throws(()=>replay(lines.map(x=>x.startsWith('!PWBACKUP BEGIN ')?x.replace(/ \d+ 36864 24576 /,` ${version} 36864 24576 `):x)));
+}assert.equal(file.sha256.length,64);
+assert.equal(crc32(new TextEncoder().encode('123456789')),'cbf43926');
+const data=lines.findIndex(x=>x.startsWith('!PWBACKUP DATA'));
+assert.throws(()=>replay(lines.filter((_,i)=>i!==data)));
+const dup=[...lines];dup.splice(data,0,lines[data]);assert.throws(()=>replay(dup));
+const corrupt=[...lines];corrupt[data]=corrupt[data].slice(0,-2)+'ff';assert.throws(()=>replay(corrupt));
+const truncated=lines.filter(x=>!x.startsWith('!PWBACKUP END'));assert.equal(replay(truncated),undefined);
+assert.equal(new Receiver('0'.repeat(32)).accept('!PWBACKUP READY '+'f'.repeat(32)+' 001122334455'),null);
+console.log(JSON.stringify(file));
+'''
+def main():
+    spec=importlib.util.spec_from_file_location('restore',ROOT/'tools/save-manager/restore.py');m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+    with tempfile.TemporaryDirectory() as tmp:
+        t=Path(tmp);(t/'test.c').write_text(C);(t/'test.mjs').write_text(JS)
+        subprocess.run(['cc','-std=c11','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-fno-sanitize-recover=all','-I',str(ROOT/'firmware/main'),str(t/'test.c'),str(ROOT/'firmware/main/restore_journal.c'),'-o',str(t/'test')],check=True)
+        result=subprocess.run([str(t/'test')],capture_output=True,text=True,check=True);(t/'wire.txt').write_text(result.stdout)
+        result=subprocess.run(['node',str(t/'test.mjs'),(ROOT/'tools/save-manager/web/backup.mjs').as_uri(),str(t/'wire.txt'),str(ROOT/'firmware/main/save.h')],capture_output=True,text=True,check=True)
+        f=t/'test.pksave';f.write_text(result.stdout);meta,raw=m.decode(f);assert len(raw)==24576
+        # A future firmware emits a new schema using the unchanged C protocol.
+        # The same shipped browser and offline decoder must handle it unchanged.
+        for future in (18, 99, 65535):
+            wire=subprocess.run([str(t/'test'),str(future)],capture_output=True,text=True,check=True)
+            (t/'future-wire.txt').write_text(wire.stdout)
+            decoded=subprocess.run(['node',str(t/'test.mjs'),(ROOT/'tools/save-manager/web/backup.mjs').as_uri(),str(t/'future-wire.txt'),str(ROOT/'firmware/main/save.h'),str(future)],capture_output=True,text=True,check=True)
+            future_file=t/'future.pksave';future_file.write_text(decoded.stdout)
+            assert m.decode(future_file)[0]['save_version']==future
+
+        header=struct.pack('<IIII32s',0x31525750,24576,0,0,b'\x11'*32)
+        import zlib
+        assert m.journal_pending(header+struct.pack('<I',zlib.crc32(header)))
+        assert not m.journal_pending(b'\xff'*4096)
+        calls=[];flash=bytearray(b'\xaa'*24576)
+        def fake(*args,**opts):
+            calls.append(args)
+            if args[0]=='read_mac':return 'MAC: 00:11:22:33:44:55'
+            if args[0]=='read_flash':
+                if args[1]=='0x8000':data=struct.pack('<HBBII16sI',0x50aa,1,2,0x9000,24576,b'nvs',0)+b'\xff'*32
+                elif args[1]=='0x10000':
+                    data=bytearray(256);data[0]=0xe9;struct.pack_into('<I',data,32,0xabcd5432);data[48:58]=b'test-build';data[80:88]=b'PokeWalk';data[176:208]=b'\x11'*32
+                else:data=flash
+                Path(args[3]).write_bytes(data)
+            elif args[0]=='write_flash':flash[:]=Path(args[2]).read_bytes()
+            return ''
+        try:m.restore(f,'fake','bad',t/'backups',fake);raise AssertionError('confirmation bypass')
+        except ValueError:pass
+        assert not calls
+        result=m.restore(f,'fake',meta['device_id'],t/'backups',fake);assert result['verified'] and bytes(flash)==raw
+        before_meta,old=m.decode(result['previous_backup']);assert old==b'\xaa'*24576
+        assert before_meta['save_version']==meta['save_version']
+        assert [c for c in calls if c[0]=='write_flash'][0][1]=='0x9000'
+        calls.clear()
+        def wrong(*args,**opts):calls.append(args);return 'MAC: 00:11:22:33:44:56'
+        try:m.restore(f,'fake',meta['device_id'],t/'backups',wrong);raise AssertionError('wrong device')
+        except ValueError:pass
+        assert not any(c[0]=='write_flash' for c in calls)
+        calls.clear()
+        def other_build(*args,**opts):
+            result=fake(*args,**opts)
+            if args[0]=='read_flash' and args[1]=='0x10000':
+                target=Path(args[3]);data=bytearray(target.read_bytes());data[176:208]=b'\x22'*32;target.write_bytes(data)
+            return result
+        try:m.restore(f,'fake',meta['device_id'],t/'backups',other_build);raise AssertionError('wrong firmware')
+        except ValueError:pass
+        assert not any(c[0]=='write_flash' for c in calls)
+        for version in (1,15,16,17,18,99,1000,65535):
+            item=dict(meta,save_version=version);f.write_text(json.dumps(item));assert m.decode(f)[0]['save_version']==version
+        for key,value in [('save_version',0),('save_version',-1),('save_version',1.5),('save_version',True),('save_version','17'),('format_version',2),('sha256','0'*64),('save_version',65536),('nvs_offset',0),('nvs_size',1),('payload_base64','garbage')]:
+            bad=dict(meta);bad[key]=value;f.write_text(json.dumps(bad))
+            try:m.decode(f);raise AssertionError(key)
+            except (ValueError,KeyError):pass
+    print(json.dumps({'passed':True,'device_protocol':'ASan/UBSan','browser':'current and future C schemas 18/99/65535, malformed versions, missing/duplicate/corrupt/truncated frames','restore':'confirmation, device, metadata, checksum, prebackup and NVS-only roundtrip'}))
+if __name__=='__main__':main()

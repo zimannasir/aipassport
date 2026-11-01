@@ -1,0 +1,280 @@
+# AI Passport 社区发布
+
+## 2026-10-29 · 声音与亮度设置：REV-4043 已提交审核
+
+[PR #6](https://github.com/Luobata/ESP32-PokemonGo/pull/6) 已合并 main（`c7eab74`），最终 PR 固件 CI 通过。[GitHub v2026.10.29-audio-brightness](https://github.com/Luobata/ESP32-PokemonGo/releases/tag/v2026.10.29-audio-brightness) 已公开，四个附件已下载回读。官网攻略与离线 ZIP 同步更新，14 项公开资源一致。社区原项目 **234 / pokewalk** 已提交 **REV-4043**，当前 **pending（待审核）**，上一公开版 REV-3784 已 approved；原暴鲤龙封面、四张附图、games 分类和 Remix 设置保留，没有另发评论。
+
+新安装在缺少声音设置时默认有声、音量 55%，已有静音与音量选择保留。「屏幕亮度」增加独立调节页，显示百分比和亮度条，范围 10%–100%，A/B 按 10% 调整并立即保存，重启和唤醒继续使用原亮度。
+
+已完成真机保档烧录、亮度上下限及熄屏唤醒、旧备份跨构建导入、新备份在 Wi-Fi 与零音量音频运行下的覆盖恢复；最终 125 个伙伴及相关进度比对一致，设备恢复原静音、音量和亮度。61 项本地检查及构建通过；759 个体及历史全格式属于宿主/隔离 NVS 验证，不冒充真机满仓或扬声器实听。
+
+存档仍为 V32，支持同设备 V5–V32，分区和备份协议不变。需升级固件，刷新网页只更新说明；支持格式 4 的旧离线工具仍可用。已有设备优先使用 USB 保档更新包，社区完整安装前先备份、安装后导入。devbox 仍按此前指示暂缓。
+
+[中文发布说明](2026-10-29-audio-brightness/changelog.zh.md) · [官网更新](https://luobata.github.io/ESP32-PokemonGo/guide/#updates) · [验证与发布记录](../../reports/audio-brightness-release-2026-10-29.md)。
+
+## 2026-10-26 · 捕虫调查投球修复与流畅度优化：REV-3784 已提交审核
+
+[PR #5](https://github.com/Luobata/ESP32-PokemonGo/pull/5) 已合并 main（`6331103`），最终 PR 固件 CI 全部通过。[GitHub v2026.10.26-bug-survey](https://github.com/Luobata/ESP32-PokemonGo/releases/tag/v2026.10.26-bug-survey) 已公开；完整安装、USB 保档更新、manifest 和离线工具四个附件下载回读一致。沿用真机验收应用，完整包 3,294,816 B，SHA-256 `8b49d5151a9d5f46021218682faef745444e6e9dad27354a5cb9e21098c215f1`。
+
+社区原项目 **234 / pokewalk** 新修订 **REV-3784** 当前 **pending（待审核）**，上一公开版 REV-3696 已 approved。双语介绍、操作和发布说明、源码及固件摘要回读一致；提交原皮卡丘对战暴鲤龙封面与雷达、漫游、赤红、照料四张附图，没有另发评论。新版服务自动处理分类，回读已为 games，与公开版一致；未手动修改分类或 Remix 策略。
+
+选中「投球」后按下 C 即响应，用最后显示的指针判定；普通捕获与捕虫共用蓝区/箭头，切换目标与球种重建显示，投球目标与判定锁定。指针仅刷新捕获条、投球只刷新变化区域，静止姿态提交存档并暂停动作时钟。真机指针约 24.8 FPS，1.2 秒往复与捕获公式、动作时长保持。整局六点合计三次投球，机会或当前球耗尽时禁用无效投球。官网操作说明和版本页同步更新，在线资源与离线 ZIP 共 14 项核对一致。
+
+存档仍为 V32，兼容同设备 V5～V32，分区和备份协议不变，支持格式 4 的离线工具继续可用。修复需要升级固件，单独刷新网页不会改变设备。更新前备份，已有设备优先用 USB 保档更新；社区完整安装后需导入备份。玩家反馈的首次蓝区过长尚未复现；一次 USB 超时安全拒绝覆盖后重试成功，未宣称所有蓝区或存档问题根治。devbox 仍按此前指示暂缓。
+
+[中文发布说明](2026-10-26-bug-survey/changelog.zh.md) · [官网更新](https://luobata.github.io/ESP32-PokemonGo/guide/#updates) · [完整验证记录](../../reports/bug-survey-release-2026-10-26.md)。
+
+## 2026-10-25 · 雷达与地图漫游：REV-3696 已提交审核
+
+代码已推送并通过 [PR #4](https://github.com/Luobata/ESP32-PokemonGo/pull/4) 合并 main（`612e17e`）。PR 固件 CI 全部通过；[GitHub v2026.10.25-radar-maps](https://github.com/Luobata/ESP32-PokemonGo/releases/tag/v2026.10.25-radar-maps) 已公开，四个附件下载回读与真机验收应用一致。完整包 3,293,456 B，SHA-256 `93dd1a3468c4195c012072ce2fc2f71b12f59dbf7f158c3d1809b3d14a596f5d`。
+
+原社区项目 **234 / pokewalk** 的 **REV-3696** 当前 **pending（待审核）**；上一版 REV-3636 已通过。沿用皮卡丘对战暴鲤龙封面，附图增加雷达和地图漫游。中英文介绍、操作说明、更新日志、源码地址和固件摘要回读一致，没有另发评论。
+
+新增雷达及捕虫公园、阿露福遗迹、烧焦塔三张小地图。两种搜寻均耗 5 体能，雷达冷却 120 秒、每图 180 秒。基础闪光率分别为 **1/32（3.125%）**、**1/24（约 4.17%）**，叠加已有探索连携。官网的玩法、候选池、解锁、等级、闪光及更新说明已同步，在线 13 项资源和离线 ZIP 共 14 项核对一致。
+
+逻辑 V32 支持同设备 V5～V32；分区及备份容器不变。已完成 V31→V32 和 V32→V32 的真机亮度变化后覆盖恢复；历史全格式、满仓和故障边界仍区分宿主与真机范围。新玩法需升级固件，网页刷新可看新攻略；旧离线工具请重新下载。更新前先备份，已有设备优先用 USB 保档更新，完整安装须先备份再恢复。devbox 仍按用户先发布 GitHub 和社区的指示暂缓，当前使用官网或本次离线 ZIP。
+
+[中文发布说明](2026-10-25-radar-maps/changelog.zh.md) · [玩法攻略](https://luobata.github.io/ESP32-PokemonGo/guide/#field) · [闪光规则](https://luobata.github.io/ESP32-PokemonGo/guide/#shiny) · [验证与发布记录](../../reports/radar-release-2026-10-25.md)。
+
+## 2026-10-24 · 城都的来信：REV-3636 已提交审核
+
+城都代码已提交推送并合入 main；[PR #3](https://github.com/Luobata/ESP32-PokemonGo/pull/3) 及合并后的 [main 固件 CI](https://github.com/Luobata/ESP32-PokemonGo/actions/runs/40102746582) 均通过。[GitHub v2026.10.24-johto](https://github.com/Luobata/ESP32-PokemonGo/releases/tag/v2026.10.24-johto) 已公开，标签对应 `590aaa794c3408b6da09931412cbe2b12a8aaf9a`。完整安装包、USB 保档更新包、manifest 和离线工具四个附件已从公开版本下载回读，与本地验收产物一致。
+
+社区原项目 **234 / pokewalk** 新版本 **REV-3636** 当前 **pending（待审核，尚未公开）**；上一公开版本仍为 REV-2661。双语介绍、使用说明、更新日志、源码地址及固件摘要回读一致。沿用原皮卡丘对战暴鲤龙封面与四张附图，上传前逐张查看；API 未返回待审图库字节，不宣称服务器图片内容已回读。没有另发评论。
+
+新增 251 只图鉴、753 格仓库、城都路线与八座道馆、冠军重赛、空木传说阵容、红色暴鲤龙剧情、调查与远征，以及 17 处伙伴协作现场。官网攻略、折叠解法与更新说明已部署，在线 11 项资源和离线 ZIP 共 12 项回读一致。支持同设备 V5～V31；历史格式经宿主和隔离真实 NVS 验证，最终固件另完成真机 V30→V31 / V31→V31 亮度变化后覆盖恢复。不能将此写成所有历史用户文件或全剧情均已真机验证。
+
+**devbox 同步尚未完成。** 公司凭据过期后，用户明确选择“先完成 GitHub 和社区发布”，本次依此暂缓该部署。请使用已更新的 GitHub Pages 存档网页或本次 Release 的离线 ZIP；旧 devbox 服务不作为新版备份入口。登录恢复后再同步并核对资源。
+
+必须升级固件，并刷新在线存档网页或重新下载离线工具。已有 PokeWalk 优先使用 USB 保档更新包，更新前先备份；社区完整安装会覆盖存档区域，须先备份、安装后恢复。
+
+[完整更新内容](2026-10-24-johto/changelog.zh.md) · [验证与覆盖边界](../../reports/johto-release-2026-10-24.md) · [GitHub 回读](../../reports/evidence/johto-release-2026-10-24/github-published.json) · [社区回执](../../reports/evidence/johto-release-2026-10-24/community-submitted.json) · [官网](https://luobata.github.io/ESP32-PokemonGo/guide/#updates)。
+
+## 2026-10-12 仓库扩容：REV-2661 已提交审核
+
+项目 **234 / pokewalk** 的 **REV-2661** 已提交，状态 **pending（待审核，尚未公开）**；上一公开版本 REV-2459 已审核通过。仓库扩容至 453 格，队伍另有 6 格；同种伙伴可独立重复捕获。满仓捕获后手动选择替换对象并二次确认，默认取消，不自动覆盖旧伙伴；也可确认放弃新捕获。修复满仓结算卡住、高位仓位和同属性个体交换问题。
+
+代码已合并 main（`c191443`），发布固件固定在已验证提交 `0c768bc`；[GitHub v2026.10.12-warehouse](https://github.com/Luobata/ESP32-PokemonGo/releases/tag/v2026.10.12-warehouse) 已公开。应用 3,192,496 B，factory 分区余 215,376 B；分区最高边界 8 MiB，无重叠、未超限。完整安装包、更新 ZIP 及 manifest 的 GitHub 大小/摘要与本地已验收产物一致。
+
+本地 46 项回归和最终固件 CI 通过。真机使用实际更新 ZIP 完成首次追加仓库分区，原有地址和数据区保持；V22 跨构建导入、V23 离线工具导出再导入均完成亮度 100%→89%→100% 的实际恢复对照。联网运行五分钟后导入通过，最终再导出核对伙伴、等级/经验、技能策略、图鉴、道具、挑战与秘境等进度一致。满仓与断电测试使用隔离真实 NVS，引导浏览器原生权限弹窗和 BLE 安装未重测。扩容初版曾内存不足，未发布；最终通过把 Wi-Fi 热点代码放入 Flash 腾出内部内存，并加编译预算检查。
+
+**需升级固件、刷新在线存档网页或重新下载离线工具。** 支持同设备 V5～V23，V5～V22 自动迁移；旧文件无需修改，不支持新备份倒灌旧固件。社区完整安装可能清档，应先备份、安装后恢复；已有设备优先使用支持严格布局检查和首次追加仓库区的 USB 更新 ZIP。Pages、devbox 和两处离线 ZIP 已同步并逐文件核对一致，ZIP 与真机离线验收使用的资源相同。
+
+沿用皮卡丘对战暴鲤龙封面、四张附图及原视频入口。社区双语字段、分类 games、源码地址和固件摘要回读一致；图片随本次请求提交并已检查本地上传文件，未重新读取待审服务器图片内容。没有另发评论。
+
+[中文说明](2026-10-12-warehouse/changelog.zh.md) · [验证报告](../../reports/warehouse-453-2026-10-12.md) · [真机回执](../../reports/evidence/warehouse-453-2026-10-12/device.json) · [社区回执](../../reports/evidence/warehouse-453-2026-10-12/community.json)。
+
+## 2026-10-09 存档容量修复：REV-2459 已提交审核
+
+项目 **234 / pokewalk** 的 **REV-2459** 当前 **pending，尚未公开**；上一版 REV-2257 已审核通过。修复实际备份复现的共享 NVS 容量不足问题，存档改为无损压缩的 V22，保留 V5～V22 来源导入能力、既有进度及恢复保护。没有原报错日志的其他导入反馈仍须按阶段排查。
+
+源码 `99c3fab` 已推送 main，[GitHub v2026.10.09-save-capacity](https://github.com/Luobata/ESP32-PokemonGo/releases/tag/v2026.10.09-save-capacity) 已公开。本地发布检查、固件 CI、Pages CI 通过。实际发布 ZIP 保档烧录成功；V21 跨构建导入、V22 离线导出再导入、亮度变化后恢复，以及队伍/图鉴/道具/技能/秘境对照均通过。Wi-Fi 运行五分钟后导入通过，原静音设置保留。
+
+首轮真机验收拦下了主 DRAM 工作区导致 USB 备份连续内存不足的问题；未发布该构建，最终使用独立 RTC 工作区并加入链接容量检查。**需要更新固件，仅刷新网页不足。** 当前网页/离线协议不变；官网、devbox 和离线 ZIP 已同步说明并核对一致。旧版无法导出时应保留已有备份并使用分区匹配的应用更新包，避免完整安装覆盖唯一存档。
+
+沿用皮卡丘对战暴鲤龙封面、四张附图和视频。社区双语字段与固件摘要已回读一致；未另发评论。浏览器原生授权弹窗与社区 BLE 完整安装未重测，容量与中断保护的隔离测试不冒充真机覆盖。
+
+[中文增量说明](2026-10-09-save-capacity/changelog.zh.md) · [发布验证](../../reports/save-capacity-release-2026-10-09.md) · [社区回执](../../reports/evidence/save-capacity-release-2026-10-09/community.json)。
+
+## 2026-10-08 存档导入稳定性修复：REV-2257 已提交审核
+
+项目 **234 / pokewalk** 的 **REV-2257** 已提交审核，当前 **pending，尚未公开**；上一版 REV-2236 已审核通过。修复导入校验额外占用约 13 KiB 堆内存的问题，并细分失败阶段。仍为 V21，支持 V5～V21 来源，存档布局与校验边界不变。社区原反馈的备份和日志不可得，不能断定所有同文案失败都由该问题引起。
+
+源码 `5defc7f` 已推送 main，[GitHub Release](https://github.com/Luobata/ESP32-PokemonGo/releases/tag/v2026.10.08-save-import) 已公开；本地发布检查、构建、固件 CI 与 Pages CI 通过。实际更新 ZIP 已烧录：受保护数据区逐字节一致、启动保档、上一版 V21 跨构建导入、新版离线工具导出再导入，以及亮度改变后导入恢复均通过。浏览器原生授权弹窗未重新测试，断电与错误数据由隔离真实 NVS 和故障注入验证。
+
+在线存档工具、devbox 和离线 ZIP 已同步并逐文件核对。**需更新固件并刷新网页，离线用户重新下载 ZIP；仅刷新网页不足。** 原 `.pksave` 无需修改。社区完整安装仍须先备份、安装后恢复；分区匹配设备可用应用更新 ZIP。
+
+保留暴鲤龙封面、四张附图与视频入口。双语字段和固件摘要已回读核对，浏览器确认待审状态与原首图。[增量说明](2026-10-08-save-import/changelog.zh.md) · [验证报告](../../reports/import-stage-release-2026-10-08.md) · [社区回执](../../reports/evidence/import-stage-release-2026-10-08/community.json)。
+
+## 2026-10-07 招式设置与仓库管理：REV-2236 已提交审核
+
+项目 234 / pokewalk 的 **REV-2236** 已提交，当前 pending，尚未公开；上一公开版 REV-2170 已通过审核。新增个体招式启停、仓库直接放生与等级升序，并修复旧秘境记录占用 NVS 空间导致保存失败。沿用皮卡丘对战暴鲤龙封面、四张附图和宣传片。
+
+实现已推送 main；发布应用固定在已真机验证的 `4b614e7`，[GitHub Release](https://github.com/Luobata/ESP32-PokemonGo/releases/tag/v2026.10.07-move-settings) 已公开。初次 CI 遇到测试代码的 GCC 缩进告警，补上循环括号后，[固件 CI](https://github.com/Luobata/ESP32-PokemonGo/actions/runs/37626038838) 全部通过，未改动发布应用。
+
+V5～V20 迁移到 V21，V21 导出再导入及秘境历史兼容通过。真机已验证启动保档、连续保存和再次重启，未覆盖导入玩家唯一存档。社区完整安装需先备份、安装后恢复；分区匹配设备可使用 USB 应用更新 ZIP。需要更新固件才能使用新功能，官网/devbox/离线 ZIP 已同步新攻略并核对一致，存档工具协议未变。
+
+[中文更新说明](2026-10-07-move-settings/changelog.zh.md) · [发布验证](../../reports/move-settings-release-2026-10-07.md) · [社区回执](../../reports/evidence/move-settings-release-2026-10-07/community.json)。
+
+
+## 2026-10-07 闪光出场与怀旧招式译名：REV-2170 已提交审核
+
+项目 234 / pokewalk 新版本 **REV-2170** 当前 pending，尚未公开；上一版 REV-2158 已审核通过。新增金银风格闪光出场，并使「肥大」怀旧译名联动当前 191 种招式；原暴鲤龙封面、四张附图和宣传片保留，双语发布字段及固件摘要回读一致。
+
+源码 `af22e73` 已推送 main，[GitHub Release](https://github.com/Luobata/ESP32-PokemonGo/releases/tag/v2026.10.07-shiny-names) 已公开，固件 CI 通过。实际发布 ZIP 已保档烧录设备：备份回读、数据区逐字节核对和重启保档通过，妙蛙花 40 级、图鉴 103/151、96 只伙伴与秘境进度保持，静音开启。没有覆盖导入玩家唯一存档。
+
+仍支持 V5～V20 及秘境 V3→V4，存档格式/分区/协议未改。完整安装仍需先备份再导入；新效果需升级固件。官网、devbox 和离线 ZIP 已同步攻略，Pages CI 与资源校验通过。[详细验证](../../reports/shiny-names-release-2026-10-07.md) · [中文增量说明](2026-10-07-shiny-names/changelog.zh.md)。
+
+## 2026-10-06 恢复暴鲤龙封面：REV-2158 已提交审核
+
+REV-2139 已通过审核并公开。本次恢复用户选定的皮卡丘对战暴鲤龙原封面，沿用完全相同的固件与其余内容；REV-2158 当前 pending，尚未公开。官网及 devbox 已恢复，离线 ZIP 同步更新。无需重新烧录。AGENTS.md 已明确后续默认保留此封面。
+
+网站源码 `6f70d56`，Pages CI 成功，22 个资源字节一致；存档发布检查及编译通过，固件仍支持 V5～V20。浏览器已确认待审第一张为暴鲤龙，视频及其余四张图片保留。[验证记录](../../reports/cover-restore-2026-10-06.md)。下文保留此前提交时的历史状态。
+
+## 2026-10-06 轮换探索与养成：REV-2139 已提交审核
+
+按用户明确授权，撤回后的旧草稿 REV-2070 已删除，其新地图、分路与主题秘境内容合并到本次版本。原项目 **234 / pokewalk** 的 **REV-2139** 已提交审核，当前 pending，尚未公开上线；上一公开版仍为 REV-2017。
+
+新增轮换访客、特殊探索发现、养成正向加成、探索连携与捕获确认、补给平衡及累计时长。官网提供完整攻略，当前版和上一版数据分别固定到已验证提交。
+
+源码 `b4ee936` 已推送 main，[固件 CI](https://github.com/Luobata/ESP32-PokemonGo/actions/runs/37454382488) 通过，[GitHub Release v2026.10.06-exploration](https://github.com/Luobata/ESP32-PokemonGo/releases/tag/v2026.10.06-exploration) 已公开。设备以本次保档 ZIP 更新，写前备份与写后数据核对通过；启动保留妙蛙花 38 级、图鉴 98/151、六只队伍、91 只伙伴和秘境进度，静音保持。未覆盖导入玩家唯一存档。
+
+支持 V5～V20，旧秘境迁移及全部发布检查通过。完整安装仍需先备份再恢复；布局匹配的现有设备可使用应用更新 ZIP。新内容需更新固件；官网刷新、离线工具重新下载。Pages、devbox 和 ZIP 的 22 个资源与源码一致。
+
+社区中英文字段与固件摘要已回读一致，五张图片随请求提交并逐张检查；待审图库内容未由 publisher 返回，不能声称服务器图片内容已核对。详情见[发布验证](../../reports/exploration-release-2026-10-06.md)、[中文更新说明](2026-10-06-exploration/changelog.zh.md)、[社区回执](../../reports/evidence/exploration-release-2026-10-06/community.json)。
+
+
+## 2026-10-05 功能扩展：REV-2070 已提交审核
+
+原项目 **234 / pokewalk** 的 **REV-2070** 已提交审核（pending），尚未公开上线。上一公开版 **REV-2017** 已通过审核，之前的待审冲突解除。本次把八张新地图、八个主题秘境、冠军远征、地区研究和稀有伙伴奖励，以及 24 条栖息地分路、地区等级和追踪图标修复一起提交。
+
+源码 **`68ffedd`** 已合并并推送 main，[固件 CI](https://github.com/Luobata/ESP32-PokemonGo/actions/runs/37333984955) 全部通过。[GitHub Release v2026.10.05-expansion](https://github.com/Luobata/ESP32-PokemonGo/releases/tag/v2026.10.05-expansion) 已公开，完整安装包、保档 USB 更新包和 manifest 的服务端摘要与本地一致。社区双语介绍、使用说明、增量日志、games 分类、源码地址及完整固件摘要已回读一致。保留战斗封面、赤红，配上海岛探索、分路选择及主题通关，共五张经过查看的文件随请求上传；publisher API 未返回待审图库，未核对服务器端图片内容或数量。
+
+世界存档 V18 支持 V5～V18，旧秘境 V3→V4 迁移和历史样本通过。11 项存档/地区/栈检查、456 项预览检查、本地编译及两层发布包校验通过，另执行发布分区保护检查。本轮使用隔离环境中的真实 ESP-IDF NVS 恢复/回滚，没有烧录、复位或覆盖玩家设备；先前构建的真机验证不算本构建验收。
+
+新内容需升级固件。现有分区匹配设备可用保档 ZIP；社区完整安装会覆盖旧存档区域，必须先备份、安装后导入。存档工具本轮未变，在线 Pages、devbox 与离线 ZIP 已重新核对一致，无需重新部署；早期工具仍须先刷新或重新下载。
+
+[中文增量说明](2026-10-05-expansion/changelog.zh.md) · [验证报告](../../reports/expansion-release-2026-10-05.md) · [社区回执](../../reports/evidence/expansion-release-2026-10-05/community.json) · [产物核对](../../reports/evidence/expansion-release-2026-10-05/package.json)。
+
+
+## 历史准备：2026-10-05 地区扩展（当时有待审冲突，后续已提交 REV-2070）
+
+代码 **`68d4276`** 已合并并推送 main；[固件 CI](https://github.com/Luobata/ESP32-PokemonGo/actions/runs/37236920109) 全部通过。[GitHub Release v2026.10.05-regions](https://github.com/Luobata/ESP32-PokemonGo/releases/tag/v2026.10.05-regions) 已公开，提供完整安装包、保档 USB 更新包和摘要。
+
+新增八张第一世代地区地图、八个主题秘境及冠军远征，串联三方向探索、深层调查、地区研究、首通/挑战奖励与稀有伙伴保底。保持前 151 只宝可梦。各秘境共用八节点流程，专属机关与长剧情尚未加入。
+
+世界存档升级到 V18，支持 V5～V17 迁移；旧森林秘境 V3 记录迁移到 V4。设备已使用本次发布 ZIP 完成仅应用更新，写前备份与写后数据区域核对通过；首次迁移和二次启动均正常，图鉴 91/151、队伍 6、伙伴 84、喷火龙 39 级 / 95111 经验及静音保持。**真机启动保档已验证，真机覆盖导入未执行**。当前存档网页与离线工具可处理 V18，Pages/devbox 资源与源码一致。
+
+**社区本轮尚未提交。** 原项目 234 / pokewalk 的 REV-2017 仍在审核，公开版为 REV-1966；官方 publisher 要求先解决待审冲突。本轮固件、双语介绍/说明/增量日志和五张图片已完成本地预览，没有撤回或覆盖原提交。保留战斗封面、破坏光线和赤红图片，并加入当前海岛与主题通关预览截图。完整社区安装仍会覆盖旧存档区域，必须先备份再安装、随后导入；保档 ZIP 不能作为完整固件上传。
+
+[增量说明](2026-10-05-regions/changelog.zh.md) · [实现与验证](../../reports/gen1-regions-2026-10-05.md) · [设备回执](../../reports/evidence/gen1-release-2026-10-05/device.json) · [社区准备](../../reports/evidence/gen1-release-2026-10-05/community.json) · [GitHub 发布回执](../../reports/evidence/gen1-release-2026-10-05/github-release.json)。
+
+## 历史提交：2026-10-05 历史存档兼容与安全更新
+
+原项目 **234 / pokewalk** 的 **REV-2017** 已提交审核（pending），尚未公开上线；上一公开版本为已通过审核的 REV-1966。新增 V5～V17 历史样本回归，修复早期保留字节的迁移校验，改善导入结果核对，提供只写应用的 USB 更新包。完整社区安装仍须先备份后恢复。
+
+实现 **`0f76077`** 已合并并推送 main，[GitHub CI](https://github.com/Luobata/ESP32-PokemonGo/actions/runs/37232407985) 全部通过。[GitHub Release v2026.10.05](https://github.com/Luobata/ESP32-PokemonGo/releases/tag/v2026.10.05) 已公开，提供完整安装包、保留存档 USB 更新包及摘要。社区上传包与已验证本地应用一致；中英文介绍、使用说明、增量日志、源码地址和摘要已回读一致，原五张图片随新版提交。
+
+本轮完成隔离环境中的真实 NVS 恢复验证。设备重新连接后，已使用上述发布版 `PokeWalk-update.zip` 完成仅应用更新；写入前的私有备份已回读校验，写入后受保护数据分区逐字节一致。启动版本为 `0f76077`，图鉴 90/151、队伍 6、总伙伴 83、喷火龙 39 级 / 92023 经验及静音设置保持。**真机启动保档已验证，真机覆盖导入未执行**，没有把隔离恢复当作真机导入测试。在线 Pages、devbox 资源及离线 ZIP 与当前源码一致，本轮网页无需再改动。
+
+[增量说明](2026-10-05/changelog.zh.md) · [验证记录](../../reports/save-history-compatibility-2026-10-05.md) · [发布回执](../../reports/evidence/save-history-release-2026-10-05/community.json) · [发布包](../../reports/evidence/save-history-release-2026-10-05/package.json) · [设备状态](../../reports/evidence/save-history-release-2026-10-05/device.json)。
+
+## 历史提交：2026-10-04 旧备份导入与牛奶回复
+
+原项目 **234 / pokewalk** 的 **REV-1966** 已提交审核（pending），尚未公开上线；当前公开版为已通过审核的 REV-1909。本轮修复同设备跨构建旧备份导入，并将牛奶的对战回复改为至少 50 HP 或最大 HP 的一半，取较高者。
+
+实现 `75e1f86` 已烧录当前设备并推送 main；后续测试日志宏的 GCC 兼容修复 `28d9cc2` 已通过全部 GitHub CI。发布包与设备烧录应用逐字节一致。设备图鉴 90、队伍 6、总伙伴 83、队首喷火龙 39 级 / 92023 经验保持，启动未见异常。跨版本导入的实际覆盖尚未在设备上执行，已通过生产解码、迁移、暂存边界和断电故障注入测试。
+
+GitHub Pages、在线离线工具 ZIP 及 devbox 服务已更新，运行资源摘要与源码一致。用户需要同时更新设备固件并刷新网页或重新下载离线工具；原备份不用转换。社区双语内容和固件摘要回读一致，原五张图库随新版提交。
+
+[发布说明](../../reports/release-notes-2026-10-04.md) · [社区回执](../../reports/evidence/save-import-milk-2026-10-04/community.json) · [设备回执](../../reports/evidence/save-import-milk-2026-10-04/device.json) · [网页部署](../../reports/evidence/save-import-milk-2026-10-04/save-manager.json) · [GitHub CI](https://github.com/Luobata/ESP32-PokemonGo/actions/runs/37189944977)
+
+## 历史提交：2026-10-03 电量、闪光与秘境伙伴
+
+原项目 **234 / pokewalk** 的 **REV-1909** 已提交审核（pending），尚未公开上线；公开版仍为已通过审核的 1074。本轮包含菜单/照料电量显示与开关、满背包成就领取修复、按获取渠道提高闪光概率、秘境通关发现可捕获伙伴。
+
+游戏实现 `ec3d667` 与跨平台测试修复 `e80f241` 已推送 main。发布包来自干净提交 `e80f241`，GitHub CI 全部通过；官方固件结构与本项目保护分区校验通过。五张原图库图片随新版提交；双语介绍、使用说明、更新日志、固件大小与 SHA-256 已回读一致。图库图片内容未从待审接口重新下载验证。
+
+[社区回执](../../reports/evidence/battery-inline-2026-10-03/community.json) · [GitHub CI](https://github.com/Luobata/ESP32-PokemonGo/actions/runs/37134045483) · [创作者工作台](https://ai-passport.folotoy.cn/account/?project=234)。
+
+[中文更新日志](2026-10-03/changelog.zh.md) · [使用说明](2026-10-03/instructions.zh.md) · [完整发布说明](../../reports/release-notes-2026-10-03.md)。
+
+## 历史提交：2026-09-19 亮度、配网与备份修复
+
+原项目 **234 / pokewalk** 新版本 **1074** 已提交审核（pending），上一版 815 已通过审核。新增可持久保存的 10%–100% 亮度设置，修复 Wi-Fi 配网「Setup is not active」误报，以及网页/离线工具拒绝当前存档版本的问题。工具支持后续沿用现有备份格式和布局的存档版本；导入仍要求同设备、相同固件构建。
+
+实现 `d080936` 已推送 main，固件 CI 与 Pages 发布通过；网站及离线 ZIP 与源码一致。当前设备已保留进度烧录，图鉴 90、伙伴总数 83、喷火龙 39 级 / 92023 经验保持，静音开启。亮度调整、重启/唤醒恢复与真实 USB 备份验证通过。手机首次配网和 NTP 完整流程、不同亮度功耗尚未实测。
+
+此次使用社区独立「使用说明」和「更新日志」字段，增量日志仅包含本轮变化，当前介绍保留宣传片及历史说明链接；现有五张图片完整随新版提交。双语文本、分类、固件摘要已回读核对；待审图片接口需要网页登录，未完成图片下载回读。
+
+[中文增量说明](2026-09-19/changelog.zh.md) · [使用说明](2026-09-19/instructions.zh.md) · [社区回执](../../reports/evidence/settings-fixes-2026-09-19/community.json) · [设备与验证](../../reports/settings-fixes-2026-09-19.md) · [GitHub CI](https://github.com/Luobata/ESP32-PokemonGo/actions/runs/35372401070)。
+
+## 历史提交：2026-09-15 待机省电与稳定性
+
+原项目 **234 / pokewalk** 新版本 **815** 已提交审核（pending），上一版 804 已通过审核。包含音频经校验休眠与停时钟、音频事件等待、熄屏静止时 30→60 秒扫描、显示/音频初始化回滚和应用区增加 256 KiB；其余数据分区地址保持。原五张图片、宣传片与历史更新要点保留；中文介绍按接口 4000 字符上限压缩，完整说明仍在仓库。
+
+核心实现 `67baf1a`，设备/社区发布构建源码提交 `eb9a5d0`；后续仅测试断言排版修复的 `4fdaad9` 已通过 [GitHub CI](https://github.com/Luobata/ESP32-PokemonGo/actions/runs/34977293826)。两层固件校验通过，设备三段烧录核验、启动音频休眠寄存器回读和熄屏唤醒日志均通过；图鉴 56、总伙伴 52、暴鲤龙 27 级 / 31002 经验保持，静音开启。非静音听感与实际功耗未实测，不承诺具体续航增幅。
+
+[发布说明](../../reports/release-notes-2026-09-15-power.md) · [社区回执](../../reports/evidence/power-update-2026-09-15/community.json) · [设备回执](../../reports/evidence/power-update-2026-09-15/device.json) · [CI](../../reports/evidence/power-update-2026-09-15/ci.json)。
+
+## 历史提交：2026-09-15 徽章探索、离线体能与熄屏修复
+
+原项目 **234 / pokewalk** 新版本 **804** 已提交审核（pending），上一版 631 已通过审核。代码 `449d6a3` 已合并并推送 main；包含八项徽章活动、随机追踪轮换、野怪等级调整、Wi-Fi 校时补回关机体能、面板休眠修复。新道具及搜寻事件增强只提交设计稿，未计入可玩功能。
+
+双语正文、分类 games、项目标识及固件摘要已回读一致；五张原图库图片全部随新版提交，宣传片和历史版本说明保留。[发布说明](../../reports/release-notes-2026-09-15.md) · [社区回执](../../reports/evidence/release-2026-09-15/community.json)。
+
+发布构建已再次烧录当前设备，三段写入校验通过；启动摘要匹配，图鉴 56、伙伴总数 52、队首暴鲤龙 27 级 / 31002 经验保持，静音开启。烧录前保存当前进度并备份完整 8MB，私有备份不入库。[设备回执](../../reports/evidence/release-2026-09-15/device.json) · [发布包校验](../../reports/evidence/release-2026-09-15/package.json)。手机首次配网、NTP 与关机补算的完整实机流程以及实际待机功耗仍待验收。
+
+## 历史提交：2026-09-14 USB 存档管理
+
+项目 234 / pokewalk，版本 **631** 已提交审核（pending）。新增设备备份与确认导入、覆盖前自动备份、文件校验及重启恢复；当前仅支持同设备、同固件构建。代码已合并 main（`80ae06d`），英文说明按社区上限压缩（`f884933`）；五张原展示图、宣传片链接及历史更新说明保留。双语正文、分类 games、固件摘要和图库回读一致。[发布说明](../../reports/release-notes-2026-09-14.md) · [回执](../../reports/evidence/usb-save-backup/community-release.json)。上一版 624 已审核通过。
+
+GitHub Pages 在线入口已部署：https://luobata.github.io/ESP32-PokemonGo/ 。通过 HTTPS 直接在桌面 Chrome / Edge 授权目录与 USB，无需 Python、内网或本地服务。网页变更推送 main 后自动发布；存档留在用户电脑。线上资源摘要、脚本 MIME 和浏览器入口已核对。[部署回执](../../reports/evidence/usb-save-backup/github-pages.json)。
+
+开发存档服务已部署 devbox，内网入口 http://10.37.197.13:8767/ 。普通 HTTP 入口提供本地工具 ZIP；下载并启动后，在 localhost 使用浏览器 USB 与目录授权，不需要开发机 SSH 权限。工具不上传存档。本次仅更新网页分发方式，社区固件仍为版本 631。按用户要求追加的字节内网存档工具评论已提交审核，页面回执为「提交成功，审核通过后公开」。[评论回执](../../reports/evidence/usb-save-backup/community-comment.json)。
+
+## 历史提交：2026-09-13 晚间
+
+社区项目 234 / pokewalk，版本 624 已提交审核（pending）。本版包含体能约 1 小时回满、仓库筛选排序与快速翻页、秘境换宠结束确认。代码提交 `ec9dc53`，双语说明、五张截图、宣传片链接均已回读核对；固件 SHA-256 见 [发布回执](../../reports/evidence/stamina-one-hour-2026-09-13/community-release.json)。烧录和存档验证见同目录 `device-flash.json`。以下内容保留历史发布记录。
+
+2026-09-13 图片补充：原版本 **607 已审核通过**；同项目新增版本 **613** 已提交审核（pending）。保留原战斗封面，追加照料、破坏光线特效、赤红登场、局内强化，共 **5 张图**；中英文介绍加入宣传片观看／下载链接。视频链接评论此前已提交审核，不重复发送。固件保持 607 的内容与摘要不变。[本次记录](../../reports/community-media-2026-09-13.md)。
+
+2026-09-13：森林秘境与体能统一已合并 main，并上传原项目 **234 / pokewalk** 的新版本 **607**，当前 **pending（待审核）**。固件大小 3,091,152 字节，SHA-256 `d67974d037aa1cb305f5446891e57f1ada6dbbc2df48d044b47c464e07d6208d`。双语介绍、源码地址、分类 games 和固件摘要回读一致；沿用清晰战斗封面。最近三轮汇总评论此前已提交审核，本次不重复发送。[发布说明](../../reports/release-notes-2026-09-13.md) · [操作记录](../../reports/community-update-2026-09-13.md)。
+
+
+2026-09-11 已提交项目234 / pokewalk的新版本404，状态pending（待审核），分类games。双语正文、分类与固件SHA-256回读一致。新版包含动画时钟修复、探索情报合并、两小时体能恢复、换宠等级和完整进化演出与叫声，并保留9月10日历史说明。回执：reports/evidence/community-update-2026-09-11/project-receipt.json。社区评论草稿已整理，但电脑锁定，尚未发布，待解锁后继续。
+
+分类修正已完成：项目 234，新版本 401，分类 games（游戏与互动），状态 pending。此前版本 400 已审核通过；本次沿用其固件、封面及双语正文，仅修正分类。固件摘要和正文回读核对一致。回执：reports/evidence/community-update-2026-09-10/category-corrected-receipt.json。
+
+2026-09-10 新版提交：项目 `234` / pokewalk，版本 `400`，状态 `pending`。旧版 378 已通过审核。沿用原战斗封面，中英文介绍追加今日更新说明，回读正文和固件摘要一致。官方接口把分类重置为 `developer`，等待网页登录后改回 `games`。回执见 `reports/evidence/community-update-2026-09-10/project-receipt.json`。
+
+2026-09-09 已提交审核：项目 `234`，版本 `378`，slug `pokewalk`，分类「游戏与互动」，状态 `pending`。可在[创作者工作台](https://ai-passport.folotoy.cn/account/?project=234)查看；待审核通过后才公开展示。回执见 `reports/evidence/community-publisher-2026-09-09/submission-receipt.json`。
+
+公开源码：https://github.com/Luobata/ESP32-PokemonGo 。发布分支为 `main`。最新双语标题与介绍以 [submission.json](submission.json) 为准，包含探索补给、12 位地图训练家、经验追赶和路线研究。社区项目地址与审核状态以官方提交回执为准。
+
+2026-09-10 已将封面更换为清晰的原始战斗帧，项目 `234` / 版本 `378` 仍为待审核；固件、分类与双语介绍不变。
+
+## 已备材料
+
+- 合并固件：本地 `release/community/FoloToy-AI-Passport-full.bin`，烧录地址 `0x0`。
+- 封面：`reports/evidence/community-cover-2026-09-10/cover.png`，480×640、3:4 竖版。取自游戏录屏 78.5 秒，双方精灵完整可见，无影分身遮挡。发布副本为 `release/community/pokewalk-cover.png`，来源与更新回执见同目录 `cover-update.json`。
+- 历史真机证据：`release/community/device-screen.png` 及其回执属于此前版本；最新官方发布流程不要求设备截图，本次上传未将其作为新版证明。
+- 宣传片：`reports/video/pokewalk-story-red-2026-09-09/pokewalk-story-v3.mp4`，约3分43秒，包含完整博士转场与赤红片段。
+- 新片包含图鉴追踪、梦幻三段线索与成功捕获、队伍经验分享和强化道馆；演示存档章节在片中标注。
+- 介绍草稿如下。版本限制写明，不能宣传为金银全招式复刻。
+
+## 固件生成和验证
+
+```sh
+source tools/device/idf-env.sh
+tools/device/fw.sh build
+python tools/release/package_firmware.py
+```
+
+使用 ESP-IDF 5.5.3 / ESP32-C3 / 8MB。合并 bootloader、分区表和应用；不含真实设备 NVS、cardid 或 Recovery 内容。官方原样校验器检查组件一致性、分区 MD5、应用容量、恢复入口和保护区。来源及许可证见 `tools/release/README.md`。本次结果见 `reports/evidence/community-publisher-2026-09-09/release-verification.json`。
+
+这证明产物结构通过官方检查，不等同于已经通过社区 BLE 安装/更新实测。当前工程目录与官方模板不同，因此不声称跑过官方完整 `tools/validate.sh --firmware`。合并固件的 NVS 区是空白填充，原有设备保留存档应先备份并使用保留存档的组件更新流程（本次新增导入暂存区，需要同时更新分区表与应用），不能直接拿完整固件覆盖旧存档。
+
+## 实际发布步骤
+
+按 [官方发布指南](https://github.com/FoloToy/ai-passport/blob/main/docs/development/release/publish-to-community.md)：
+
+1. 从官方地址加载 [publisher 工作流](https://ai-passport.folotoy.cn/skills/folotoy-ai-passport-publisher.zip)，由其检查上述产物和字段。
+2. 在 [AI Passport 社区](https://ai-passport.folotoy.cn) 登录，进入「发布新玩法」并展开「✦ 用 AI 辅助发布」，点击「确认连接发布助手」确认授权码；授权入口默认折叠，无需把密码交给助手。
+3. 先运行 `whoami` 与 `projects` 核对授权和项目 234 / pokewalk；如已有草稿或待审版本，停止并报告冲突。最新官方流程不要求设备截图，不为发布而重置或烧录设备。
+4. 选择合并固件、3:4 封面（JPEG/PNG/WebP ≤10MiB）、公开 HTTPS 源码地址及 `submission.json` 中的双语介绍，预览后上传。
+5. 发布后取得社区页面，再考虑是否归档到上游 `plays/`；那是单独的双语文本 PR，不在此处上传固件或封面。
+
+可直接发送： “按 docs/release/community.md 准备好的材料，用官方 publisher 工作流发布到 AI Passport 社区。”
+
+## 最新发布文案
+
+完整双语字段见 [submission.json](submission.json)。旧版宣传片仍保留在仓库中，社区介绍以本次实际功能为准。
+
+## 发布工具兼容性
+
+2026-09-13：最新官方脚本已支持 `--category games`，并支持不附带设备截图的上传；本次直接更新原项目成功，无需撤回修改。下文保留早期工具行为记录，不能作为覆盖当前待审版本的操作指引。
+
+本次官方 publisher 脚本未提供分类参数，首次提交默认为「开发者实验」。已通过官网对同一项目撤回编辑，保留原封面和固件、改为「游戏与互动」后重新提交；项目和版本编号均未变化，固件 SHA-256 与校验产物一致。后续更新应使用项目 `234`，并核对分类，避免新建重复项目。
+
+更换审核中版本的封面时，先在官网「撤回并修改」，再在编辑表单替换图片、沿用固件并提交。当前 Agent resubmit 接口即使在撤回后也可能返回「已有版本正在审核」，本次通过官网表单完成；不要因此另建项目。

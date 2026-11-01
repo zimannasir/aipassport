@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+"""Package the existing IDF build; never reads or writes a connected device."""
+import argparse
+import hashlib
+import json
+import shutil
+import subprocess
+import sys
+import zipfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--build-dir', type=Path, default=ROOT / 'firmware/build',
+                    help='Existing verified IDF build (no compilation or device access).')
+BUILD = parser.parse_args().build_dir.resolve()
+# A capacity experiment is not a playable, migrated release candidate.
+cache = (BUILD / 'CMakeCache.txt').read_text()
+for line in cache.splitlines():
+    if line.startswith('POKEWALK_ASSET_PROBE_DIR:') and line.partition('=')[2]:
+        raise SystemExit('Refusing to package an asset-only capacity probe; rebuild with POKEWALK_ASSET_PROBE_DIR empty.')
+OUT = ROOT / 'release/community'
+OUT.mkdir(parents=True, exist_ok=True)
+IMAGES = [(0, 'bootloader/bootloader.bin', 'bootloader/bootloader.bin'),
+          (0x8000, 'partition_table/partition-table.bin', 'partition_table/partition-table.bin'),
+          (0x10000, 'PokeWalk.bin', 'FoloToy-AI-Passport.bin')]
+for _, source, target in IMAGES:
+    dest = OUT / target
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(BUILD / source, dest)
+(OUT / 'flash_args').write_text('--flash_mode dio --flash_freq 80m --flash_size 8MB\n' +
+    ''.join(f'{offset:#x} {target}\n' for offset, _, target in IMAGES))
+merged = OUT / 'FoloToy-AI-Passport-full.bin'
+subprocess.run([sys.executable, '-m', 'esptool', '--chip', 'esp32c3', 'merge_bin',
+    '--flash_mode', 'dio', '--flash_freq', '80m', '--flash_size', '8MB', '-o', str(merged),
+    *[arg for offset, _, target in IMAGES for arg in (hex(offset), str(OUT / target))]], check=True)
+subprocess.run([sys.executable, str(ROOT / 'tools/release/verify_firmware_upstream.py'), str(OUT)], check=True)
+subprocess.run([sys.executable, str(ROOT / 'tools/release/verify_firmware.py'), str(OUT)], check=True)
+report = {'artifact': merged.name, 'size': merged.stat().st_size,
+          'sha256': hashlib.sha256(merged.read_bytes()).hexdigest(), 'flash_address': '0x0',
+          'protected_layout_pass': True,
+          'checker_source': 'FoloToy/ai-passport@cd73a8a6f1f95e010bfd83a08e2b915e38408308 + PokeWalk data protection',
+          'application_size': (BUILD / 'PokeWalk.bin').stat().st_size,
+          'application_sha256': hashlib.sha256((BUILD / 'PokeWalk.bin').read_bytes()).hexdigest(),
+          'source_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
+          'full_install_preserves_nvs': False,
+          'full_install_warning': 'Full image padding overwrites NVS; back up before installation and import afterwards.',
+          'community_upload_performed': False, 'ble_install_tested': False}
+# An update is an address-aware application write, not a second merged image.
+# Do not submit the application-only binary to a community flash-at-zero flow.
+app = (BUILD / 'PokeWalk.bin').read_bytes()
+table = (BUILD / 'partition_table/partition-table.bin').read_bytes()
+update = {'format': 'pokewalk-app-update-v2', 'address': 0x10000, 'size': len(app),
+          'sha256': hashlib.sha256(app).hexdigest(),
+          'partition_sha256': hashlib.sha256(table).hexdigest()}
+update_zip = OUT / 'PokeWalk-update.zip'
+with zipfile.ZipFile(update_zip, 'w', zipfile.ZIP_DEFLATED) as z:
+    z.writestr('PokeWalk.bin', app)
+    z.writestr('partition-table.bin', table)
+    z.writestr('update.json', json.dumps(update, indent=2) + '\n')
+    z.write(ROOT / 'tools/release/update_firmware.py', 'update_firmware.py')
+    z.write(ROOT / 'tools/release/UPDATE.md', 'README.md')
+report['usb_update'] = {'artifact': update_zip.name,
+                       'sha256': hashlib.sha256(update_zip.read_bytes()).hexdigest(),
+                       'writes': [{'address': 0x10000, 'size': len(app)}],
+                       'requires_existing_matching_partition_table': False,
+                       'allows_only_additive_store_partition': True,
+                       'conditional_writes': [{'address': 0x8000, 'size': 4096, 'when': 'approved additive store migration only'}]}
+(OUT / 'manifest.json').write_text(json.dumps(report, indent=2) + '\n')
+print(json.dumps(report))

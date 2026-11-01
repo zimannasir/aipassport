@@ -1,0 +1,67 @@
+# 采集的原始数据不入库（可能含真实 BSSID，属位置关联数据）
+data/raw/
+*.ndjson
+
+# Swift 编译产物
+tools/collector/wifi-collect
+tools/collector/*.o
+tools/collector/*.dSYM/
+.build/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# macOS
+.DS_Store
+
+# .app 打包产物（由 make-app.sh 生成）
+tools/collector/WiFiCollect.app/
+
+# 素材产物（可由 tools/pipeline 重新生成）
+assets/*.bin
+assets/*.txt
+
+# 验收页面产物（由 tools/inspector/build.py 生成，含 200KB 内嵌资产）
+tools/inspector/index.html
+.omc/
+.device-backup/
+# 固件构建产物
+firmware/build/
+firmware/build-*/
+tools/inspector/johto-assets/
+assets/johto-candidate/
+firmware/sdkconfig
+firmware/sdkconfig.old
+firmware/managed_components/
+
+# 浏览器自动化的运行日志与报告（每次跑都变，不是源码）
+midscene_run/
+
+# Local recordings and build/serial logs: publish final videos and JSON summaries only.
+reports/**/*.log
+reports/**/*.wav
+reports/**/*silent.mp4
+reports/**/music_preview
+reports/**/music_preview.c
+/release/
+
+# Required runtime snapshot: a fresh checkout must build without private asset caches.
+!assets/gen1.bin
+!assets/gen1_front.bin
+!assets/gen1_back.bin
+!assets/palettes.bin
+!assets/font16.bin
+!assets/font16_charset.txt
+!assets/moves.bin
+!assets/ui.bin
+
+# Raw device observations may contain nearby Wi-Fi identifiers.
+/reports/evidence/directional-controls-2026-09-10/power-key-*.txt
+
+# USB save-manager exports contain private device storage.
+*.pksave
+
+# Local review-run cache (may contain machine/session data).
+/.qualitygate/

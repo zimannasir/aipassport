@@ -1,0 +1,317 @@
+"""开场画面的像素素材 —— 精灵球、手指光标、星光。
+
+## 为什么单独一个模块
+
+验收时截图暴露的问题：**画风打架**。
+精灵球是 canvas 矢量画的平滑圆、皮卡丘顶着白方块、标题用拉丁点阵字 ——
+跟 151 只 2bpp sprite 的像素画风完全不是一回事。
+
+矢量圆在像素画里格外突兀：它没有台阶感，而周围一切都有。
+
+所以这些元素也按点阵生成，与 sprite 同一套渲染路径（2bpp + 调色板）。
+
+## 为什么算法生成而非手画点阵
+
+精灵球是规则几何体。我先手画了一版 16×16，不对称、白格没对齐 ——
+算法生成能保证左右严格对称，且换尺寸不用重画。
+
+关键是**先量化到像素网格再判断**，圆边才有台阶感；
+若先算连续圆再采样会得到反锯齿的软边，那就又变回矢量观感了。
+
+零第三方依赖，Python 3.9+。
+"""
+
+from __future__ import annotations
+
+# 2bpp 色号约定（与 sprite 一致：低号深、高号浅，3 号当透明）
+INK = 0          # 描边
+MID = 1          # 主色（精灵球上半的红）
+LIGHT = 2        # 亮色（下半的白、按钮）
+CLEAR = 3        # 透明
+
+# 精灵球调色板（RGB565 源色，与 assets/palettes.bin 同格式）
+BALL_PALETTE = ["#101010", "#c83c30", "#f0f0f0", "#182838"]
+# 开球后的空球（灰）—— 用于「已经开过的球」
+BALL_OPEN_PALETTE = ["#101010", "#707070", "#c0c0c0", "#182838"]
+# 超级球（上半蓝）与高级球（上半黄）—— 形状同 poke_ball，
+# 花纹见 kind 参数；DMG 四灰下区分靠花纹，颜色给彩色屏的观感
+BALL_GREAT_PALETTE = ["#101010", "#3868c8", "#f0f0f0", "#182838"]
+BALL_ULTRA_PALETTE = ["#101010", "#c8a028", "#f0f0f0", "#182838"]
+
+
+def poke_ball(size: int = 24, open_top: bool = False,
+               kind: str = "poke") -> list[list[int]]:
+    """生成精灵球点阵。
+
+    open_top=True 时上半盖打开（画成两片分离），用于「开球」瞬间。
+
+    kind 三档（P4「换球」的区分图）。**初代三球的差异在 DMG 四灰下
+    靠花纹不靠颜色** —— 屏幕本来就只有四档灰，红/蓝/黄的上半在
+    单色下全是同一档。所以：
+      "poke"   上半净色（原样，红只是调色板的事）
+      "great"  上半两条竖纹（左右 size×0.22 处，各两像素宽）
+      "ultra"  上半一条厚横带（rows size×0.2..0.37，MID 全换 INK，
+               与中央带构成 H 型观感）
+    花纹只改 MID 格（描边与透明边界不碰），形状/对称性与 poke 完全
+    同源 —— 三球是同一颗球的三件衣服，风格必然一致。
+
+    参数是**比例**而非绝对像素，所以任何尺寸都成立：
+      描边 1.6px、中央带 size/10、按钮半径 size×0.16
+    这几个比例是照 GB 原版精灵球图标的观感调的。
+    """
+    c = (size - 1) / 2.0
+    r_out = size / 2.0
+    band = max(2.0, size / 10.0)          # 中央黑带厚度
+    btn = size * 0.16                     # 按钮半径
+
+    g = [[CLEAR] * size for _ in range(size)]
+    for y in range(size):
+        for x in range(size):
+            dx, dy = x - c, y - c
+            d = (dx * dx + dy * dy) ** 0.5
+            if d > r_out - 0.5:
+                continue                              # 圆外
+            if d > r_out - 1.6:
+                g[y][x] = INK                         # 外描边
+            elif abs(dy) < band / 2:
+                g[y][x] = INK                         # 中央带
+            elif btn - 0.2 <= d < btn + 1.3:
+                g[y][x] = INK                         # 按钮描边
+            elif d < btn:
+                g[y][x] = LIGHT                       # 按钮
+            elif dy < 0:
+                g[y][x] = MID                         # 上半（红）
+            else:
+                g[y][x] = LIGHT                       # 下半（白）
+
+    if kind == "great":
+        # 超级球：上半两条竖纹（比例定位，任何尺寸成立）
+        for y in range(int(size * 0.17), int(size * 0.42)):
+            for xc in (int(c - size * 0.22), int(c + size * 0.22)):
+                for x in (xc, xc + 1):
+                    if 0 <= x < size and g[y][x] == MID:
+                        g[y][x] = INK
+    elif kind == "ultra":
+        # 高级球：上半厚横带 —— MID 全换 INK，描边不动
+        for y in range(int(size * 0.20), int(size * 0.37)):
+            for x in range(size):
+                if g[y][x] == MID:
+                    g[y][x] = INK
+
+    if open_top:
+        # 上半盖上移 3px 并留出缝隙 —— 「打开」的最小表达
+        top = [row[:] for row in g[:size // 2]]
+        for y in range(size // 2):
+            g[y] = [CLEAR] * size
+        for y in range(size // 2):
+            ty = y - 3
+            if 0 <= ty < size // 2:
+                g[ty] = top[y]
+
+    return g
+
+
+# ---------------------------------------------------------------------------
+# 手指光标
+#
+# 原版菜单最认得出的符号。上一版用 canvas 路径画（贝塞尔平滑边），
+# 在像素画里同样突兀 —— 改成手绘点阵。
+#
+# 朝上指（三球横排的约束，见 sim/intro.py 的 CURSOR_OFFSET_Y）：
+# 竖起的食指 + 握起的拳。12×11。
+#
+# 不对称是**应该的** —— 手本来不对称，所以不对它做对称检查。
+# ---------------------------------------------------------------------------
+
+_C = """
+.....00.....
+....0220....
+....0220....
+....0220....
+....0220....
+.00002200000
+.0220222 220
+.02202222220
+.02222222220
+.00222222220
+...000000000
+""".strip().split("\n")
+
+CURSOR = [[CLEAR if ch == "." else (INK if ch == "0" else LIGHT) for ch in row]
+          for row in _C]
+CURSOR_W, CURSOR_H = len(CURSOR[0]), len(CURSOR)
+CURSOR_PALETTE = ["#101010", "#f8f8f8", "#f8f8f8", "#182838"]
+
+
+# ---------------------------------------------------------------------------
+# 菜单选中光标 —— 朝右实心三角（P2 列表 / P5 照料 / P6 图鉴 / P7 成绩）
+#
+# 为什么不用字库里的字符：**PingFang 没有任何朝右的三角字形**。
+# ▸ ▶ ► 三个都渲染成全空白（`convert_font.py --preview` 目检出来的）。
+# 收进字库只会得到一个隐形光标 —— 而「我选中的是哪一项」是四个页面
+# 唯一的选中态表达，隐形等于这四页没法用。
+#
+# 那 ▲ 呢？PingFang 有它，但朝上的三角在纵向列表里指不准行 ——
+# 它指向行与行之间，而不是某一行。
+#
+# 所以按 poke_ball 的同一条路走：算法生成点阵，走 sprite 的渲染路径。
+# 这也顺带省掉一个字库槽位（16×16 = 32 字节/字形）。
+#
+# 三角比字形更适合生成：它是纯几何的，用「行宽随行数收缩」就能画，
+# 且天然有台阶感 —— 不会出现精灵球那次「矢量圆在像素画里太平滑」的问题。
+# ---------------------------------------------------------------------------
+
+def menu_cursor(height: int = 9) -> list[list[int]]:
+    """朝右实心三角。height 应为奇数（要有唯一的尖端行）。
+
+    宽度取 height 的一半多一点（(h+1)//2）—— 等宽等高的三角太钝，
+    看着像方块；再瘦就退化成一条线。这个比例接近 GB 原版菜单光标。
+
+    每行的宽度：从尖端行往上下对称递减。第 k 行（距中心 k 行）
+    画 w-k 列，于是斜边每行退一格，台阶感是**像素级**的，
+    不需要抗锯齿也不该有。
+    """
+    if height % 2 == 0:
+        height += 1
+    w = (height + 1) // 2
+    c = height // 2
+    g = [[CLEAR] * w for _ in range(height)]
+    for y in range(height):
+        k = abs(y - c)              # 距中心的行数
+        run = w - k                 # 这一行画多少列
+        for x in range(run):
+            # 描边留在斜边外沿：最右一格用 INK，其余填 MID
+            g[y][x] = INK if x == run - 1 else MID
+    return g
+
+
+MENU_CURSOR = menu_cursor(9)
+MENU_CURSOR_PALETTE = ["#101010", "#303030", "#f0f0f0", "#182838"]
+
+
+# ---------------------------------------------------------------------------
+# 亲密度心形 —— P1 状态栏（「♥ 78」）
+#
+# 同 menu_cursor 的理由：**PingFang 没有 ♥ 的字形**（--preview 全空白）。
+# 收进字库只会得到一个隐形的心，而它是 P1 状态栏唯一的图形符号。
+#
+# 心形不像三角那样能用一条几何规则画干净，硬算出来的心在 7~9px 上
+# 总是显得肿。所以手绘点阵 —— 与 CURSOR（手指）同一处理方式：
+# 不规则形状手绘，规则几何体算法生成。
+#
+# 7×6：GB 时代的心就是这个尺寸量级，再大在 16px 行高里会顶到行距。
+# ---------------------------------------------------------------------------
+
+_H = """
+.00.00.
+0220220
+0222220
+.02220.
+..020..
+...0...
+""".strip().split("\n")
+
+HEART = [[CLEAR if ch == "." else (INK if ch == "0" else MID) for ch in row]
+         for row in _H]
+HEART_W, HEART_H = len(HEART[0]), len(HEART)
+HEART_PALETTE = ["#101010", "#e04858", "#f8a0a8", "#182838"]
+
+
+
+# ---------------------------------------------------------------------------
+# 星光 —— 闪光出场用（S8）
+#
+# 四角星，三档尺寸。GB 的闪光星星就是这种简单十字星，
+# 不是多角星也不是光晕。
+# ---------------------------------------------------------------------------
+
+def star(size: int = 7) -> list[list[int]]:
+    """四角星点阵 —— 十字主芒 + 对角短芒。size 应为奇数。
+
+    GB 的闪光星星就是这种简单十字星，不是多角星也不是光晕。
+
+    我第一版用「双循环镜像」写（g[c+i][c+j] 与 g[c+j][c+i] 同时赋值），
+    长出了斜向杂散点 —— 镜像赋值把主芒也镜像成了对角线。
+    改成显式画十字 + 中心菱形，形状才干净。
+    """
+    if size % 2 == 0:
+        size += 1
+    c = size // 2
+    g = [[CLEAR] * size for _ in range(size)]
+
+    # 十字主芒（贯穿全宽/全高）
+    for i in range(size):
+        g[c][i] = LIGHT
+        g[i][c] = LIGHT
+
+    # 中心加粗成菱形，让它看起来"亮"
+    if size >= 5:
+        for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            g[c + dy][c + dx] = LIGHT
+        g[c - 1][c - 1] = g[c - 1][c + 1] = LIGHT
+        g[c + 1][c - 1] = g[c + 1][c + 1] = LIGHT
+
+    return g
+
+
+# 两档就够：小星做散射、大星做中心爆点。
+# 原本设了 5/7/9 三档，9×9 加对角芒时间隔太稀、看着是散点不是光芒 ——
+# 十字星在这个尺寸区间本来就只有「小」和「大」两种有意义的形态。
+STAR_SIZES = (5, 7)
+STAR_PALETTE = ["#101010", "#fff0a0", "#ffffff", "#182838"]
+
+
+# ---------------------------------------------------------------------------
+# 导出为 2bpp 字节流 —— 与 gen1_front.bin 同格式，固件同一套解码
+# ---------------------------------------------------------------------------
+
+def to_2bpp(grid: list[list[int]]) -> bytes:
+    """点阵转 2bpp。每字节 4 像素，高位在左（与 convert_sprites.py 一致）。"""
+    h, w = len(grid), len(grid[0])
+    out = bytearray()
+    for y in range(h):
+        for x0 in range(0, w, 4):
+            b = 0
+            for k in range(4):
+                v = grid[y][x0 + k] if x0 + k < w else CLEAR
+                b |= (v & 3) << (6 - k * 2)
+            out.append(b)
+    return bytes(out)
+
+
+def budget() -> dict:
+    """这些素材的 flash 占用 —— 验证「零素材成本」这个说法还成立。"""
+    items = {
+        "ball_24": to_2bpp(poke_ball(24)),
+        "ball_24_open": to_2bpp(poke_ball(24, open_top=True)),
+        "cursor": to_2bpp(CURSOR),
+        "menu_cursor": to_2bpp(MENU_CURSOR),
+        "heart": to_2bpp(HEART),
+    }
+    for s in STAR_SIZES:
+        items[f"star_{s}"] = to_2bpp(star(s))
+    return {
+        "per": {k: len(v) for k, v in items.items()},
+        "total": sum(len(v) for v in items.values()),
+    }
+
+
+def ascii_preview(grid: list[list[int]]) -> str:
+    """终端预览 —— 点阵对不对，只有看出来才知道。"""
+    m = {INK: "██", MID: "▒▒", LIGHT: "░░", CLEAR: "  "}
+    return "\n".join("".join(m[v] for v in row) for row in grid)
+
+
+def is_symmetric(grid: list[list[int]]) -> bool:
+    """左右对称检查 —— 精灵球与星星都必须对称。"""
+    return all(row == row[::-1] for row in grid)
+
+
+def is_vsymmetric(grid: list[list[int]]) -> bool:
+    """上下对称检查 —— 菜单三角光标用这个。
+
+    朝右的三角**左右不对称**（那是它的全部意义），
+    所以 is_symmetric 对它永远返回 False。要检查的是纵向：
+    尖端必须在正中间，否则光标会指偏行。
+    """
+    return grid == grid[::-1]

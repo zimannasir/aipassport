@@ -1,0 +1,1457 @@
+#!/usr/bin/env python3
+"""把固件二进制资产打包进验收页面。
+
+用法：
+    python3 tools/inspector/build.py --src /tmp/gen1
+
+读 tools/pipeline 的产物（gen1.bin / gen1_front.bin / gen1_back.bin），
+解码成 JSON 内嵌进 template.html，输出 index.html。
+
+**页面读的是固件真实产物，不是另画一份** —— 否则验收就没意义。
+解码逻辑（2bpp 解包、分段寻址）与固件侧必须一致，
+页面里的 JS 实现就是那份逻辑的对照参考。
+
+字库生成需要 fontTools；资产或字体依赖缺失时构建失败。
+"""
+
+from __future__ import annotations
+
+import argparse
+import base64
+import hashlib
+import json
+import os
+import pathlib
+import struct
+import subprocess
+import sys
+
+HERE = pathlib.Path(__file__).resolve().parent
+REPO = HERE.parent.parent
+
+TYPES_CN = ["一般", "火", "水", "电", "草", "冰", "格斗", "毒",
+            "地面", "飞行", "超能", "虫", "岩石", "幽灵", "龙"]
+BIOMES_CN = ["野外", "住宅区", "办公区", "商业区", "交通枢纽"]
+TRIGGERS = {0: "升级", 1: "道具", 2: "交换", 255: ""}
+FRONT_SIZES = [40, 48, 56]
+ASSET_FILES = ("gen1.bin", "gen1_front.bin", "gen1_back.bin", "palettes.bin",
+               "font16.bin", "moves.bin", "ui.bin")
+FONT_BEGIN = "/* KANTO16:BEGIN */"
+FONT_END = "/* KANTO16:END */"
+
+
+def rgb565_hex(value: int) -> str:
+    """与 tools/device/screenshot.py 相同：位复制展开到 RGB888。"""
+    r, g, b = (value >> 11) & 31, (value >> 5) & 63, value & 31
+    return f"#{((r << 3) | (r >> 2)):02x}{((g << 2) | (g >> 4)):02x}{((b << 3) | (b >> 2)):02x}"
+
+
+def source_manifest(repo: pathlib.Path | None = None) -> dict:
+    """记录实际生成输入；路径相对仓库，内容变化、增删均使产物过期。"""
+    repo = repo or REPO
+    paths = {repo / "assets" / name for name in ASSET_FILES}
+    for pattern in ("tools/inspector/*.py", "tools/inspector/template.html",
+                    "tools/inspector/host/**/*.c", "tools/inspector/host/**/*.h",
+                    "tools/pipeline/*.py", "tools/pipeline/*.c", "sim/*.py",
+                    "firmware/main/*.c", "firmware/main/*.h",
+                    "firmware/main/CMakeLists.txt", "data/raw/*.ndjson"):
+        paths.update(repo.glob(pattern))
+    return {str(p.relative_to(repo)): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in sorted(paths) if p.is_file() or p.name in ASSET_FILES}
+
+
+def payload_hash(payload: dict) -> str:
+    # JSON 往返统一整数键 / tuple，保证导出前与浏览器实际 JSON 的口径一致。
+    plain = json.loads(json.dumps({k: v for k, v in payload.items()
+                                   if k != "buildManifest"}, ensure_ascii=False))
+    encoded = json.dumps(plain, ensure_ascii=False, sort_keys=True,
+                         separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def require_firmware_assets(assets: pathlib.Path) -> None:
+    """sim / 字库 / native 均读固件 assets；外部目录只接受同内容副本。"""
+    for name in ASSET_FILES:
+        p = assets / name
+        if not p.is_file():
+            raise ValueError(f"缺少固件资产 {p}；请先完成素材管线，不生成回退预览")
+        source = REPO / "assets" / name
+        if p.resolve() != source.resolve() and p.read_bytes() != source.read_bytes():
+            raise ValueError(f"{p} 与固件 {source} 不同；请更新固件 assets 后再构建预览")
+
+
+def _scene_cli() -> pathlib.Path:
+    """编出 scene_cli 求值器，返回可执行路径。两条配方导出共用。
+
+    **失败即失败，不静默退回** —— 若这里 fallback 成「web 自己算」，
+    就等于悄悄退回分叉状态，而门禁与画面都看不出来。
+    """
+    src = REPO / "tools" / "pipeline" / "scene_cli.c"
+    inc = REPO / "firmware" / "main"
+    # 构建和门禁可以并行，避免另一进程覆盖正在执行的求值器。
+    out = pathlib.Path(os.environ.get("TMPDIR", "/tmp")) / f"scene_cli.build.{os.getpid()}"
+    # 既有门禁（verify_battle.py:187）用裸 "cc"；这里同口径，
+    # 但显式回退 /usr/bin/cc —— 交互 shell 里 cc 可能被别名劫持。
+    r = None
+    for compiler in ("cc", "/usr/bin/cc"):
+        try:
+            r = subprocess.run([compiler, "-std=c11", "-O1", "-Wall", "-Wextra",
+                                "-Werror", "-I", str(inc), "-o", str(out), str(src),
+                                str(inc / "battle_hud.c")],
+                               capture_output=True, text=True)
+            if r.returncode == 0:
+                return out
+        except FileNotFoundError:
+            continue
+    raise RuntimeError("scene_cli.c 编译失败：" +
+                       (r.stderr[:400] if r else "找不到可用的 cc"))
+
+
+def _scene_p3_pet_hp(scenarios: list[dict]) -> dict:
+    """构建期用共享 C 配方求 P3 主宠 HP 条的绘制矩形（D77 第 2 步）。
+
+    ## 为什么在构建期而不是浏览器里
+
+    `docs/11-render-engine.md:36` 判定过：确定性演示时间线本来就在构建期
+    导出页面数据，所以同一条 C 只要能在构建期求值就够，**不必引入 WASM**。
+    任意交互输入才需要 WASM，那是第 5 步。本函数就是那条判定的落地。
+
+    ## 求值器
+
+    `tools/pipeline/scene_cli.c` —— 与固件 `play_battle.c` **include 同一个
+    `render_scene.h`**。web 因此零求解逻辑：只按 (剧本, 回合) 查矩形并填色。
+
+    ## 失败即失败，不静默退回
+
+    编译或求值失败直接 raise —— **若这里 fallback 成「web 自己算」，
+    就等于悄悄退回分叉状态，而门禁与画面都看不出来**。
+    """
+    out = _scene_cli()
+
+    frames: dict[str, list] = {}
+    for sc in scenarios:
+        args = [f"{rd['petHp']}/{sc['petMax']}" for rd in sc["rounds"]]
+        p = subprocess.run([str(out), "p3_pet_hp_batch", *args],
+                           capture_output=True, text=True)
+        if p.returncode != 0:
+            raise RuntimeError(f"scene_cli 求值失败：{p.stderr[:400]}")
+        frames[sc["label"]] = json.loads(p.stdout)["frames"]
+    return {"source": "firmware/main/render_scene.h via tools/pipeline/scene_cli.c",
+            "byScenario": frames}
+
+
+def _scene_p3_pet_name(scenarios: list[dict]) -> dict:
+    """构建期用共享 C 配方求 P3 主宠名牌的文本与位置（D91 第 4 步）。
+
+    ## 与 HP 条那条的区别
+
+    配方输出是**「文本 + 位置 + 颜色」而不是矩形** ——
+    `scene_text_fn` 签名 `(ctx, x, y, text, color)`，
+    且 text 指针只在 callback 内有效（`render_scene.h:24`）。
+    `scene_cli.c` 的 `emit_text_json` 同步拷进 stdout，符合该契约。
+
+    ## 截断由配方判定，web 零逻辑
+
+    D53 边界（五字名 + Lv100 超 120px → **只去空格，绝不缩名字**）
+    在 `scene_p3_pet_name_sized` 里，web 只拿最终字串。
+
+    ## font_size 为什么传 16
+
+    `render_char_advance_sized(cp, size)` 的规则是 `cp<0x80 ? size/2 : size`，
+    而 `assets/font16.bin` 是 16px 字库（`FNT1`，29968 字节）。
+    **这是 cep-coder 本轮把测宽与字库数据解耦的成果** ——
+    宿主侧传 16 即可，不必链接字库、不必假 `esp_log.h`
+    （我验证过「链接真 render.c」那条路也能跑，但它要三样脚手架，见报告）。
+    """
+    exe = _scene_cli()
+    # 物种名从 gen1.bin 取（与固件 assets_species() 同一数据源），不硬编码。
+    # 剧本主宠固定 25 号皮卡丘 —— 与 sim_pages_payload 里 auto_battle(
+    # pet_species=25) 同一常量。
+    pet = load_data(REPO / "assets" / "gen1.bin")[24]["zh"]
+    by: dict[str, dict] = {}
+    for sc in scenarios:
+        p = subprocess.run([str(exe), "p3_pet_name", pet, str(sc["playerLevel"])],
+                           capture_output=True, text=True)
+        if p.returncode != 0:
+            raise RuntimeError(f"scene_cli p3_pet_name 失败：{p.stderr[:400]}")
+        by[sc["label"]] = json.loads(p.stdout)["item"]
+    return {"source": "firmware/main/render_scene.h via tools/pipeline/scene_cli.c",
+            "fontSize": 16, "byScenario": by}
+
+
+def load_data(path: pathlib.Path) -> list[dict]:
+    d = path.read_bytes()
+    magic, ver, rsz, cnt, poolsz = struct.unpack("<4sHHII", d[:16])
+    if magic != b"GEN1":
+        raise ValueError(f"{path.name} magic 不对：{magic!r}")
+
+    recs = d[16:16 + cnt * rsz]
+    pool = d[16 + cnt * rsz:]
+
+    out = []
+    for i in range(cnt):
+        o = i * rsz
+        (off, ln, t1, t2, bm, cr, tg, ev, el,
+         hp, at, df, sp, spd, fl, h, w, zo, zl, pi, _rv) = struct.unpack(
+            "<HBBBBBBBBBBBBBBHHHBB8s", recs[o:o + rsz])
+        out.append({
+            "id": i + 1,
+            "slug": pool[off:off + ln].decode("utf-8"),
+            "zh": pool[zo:zo + zl].decode("utf-8") if zl else "",
+            "pal": pi,                    # 与 assets_species 的完整 uint8 索引一致
+            "t1": TYPES_CN[t1] if t1 < len(TYPES_CN) else "?",
+            "t2": TYPES_CN[t2] if t2 < len(TYPES_CN) else None,
+            "biomes": [BIOMES_CN[j] for j in range(5) if bm >> j & 1],
+            "catch": cr,
+            "trig": TRIGGERS.get(tg, ""),
+            "evo": ev, "lv": el,
+            "st": [hp, at, df, sp, spd],     # 第 4 项是初代单一 Special
+            "legend": bool(fl & 1), "myth": bool(fl & 2),
+            "fsize": FRONT_SIZES[(fl >> 2) & 3],
+            "h": h, "w": w,
+        })
+    return out
+
+
+def load_palettes(path: pathlib.Path) -> dict:
+    """调色板表：N 套原版普通/闪光配对 + 每只索引。
+
+    彩色屏用，且闪光就是换调色板（S8）—— 位图完全相同。
+    """
+    d = path.read_bytes()
+    if len(d) < 12:
+        raise ValueError(f"{path.name} 头部截断")
+    magic, ver, nsets, ncolors, count = struct.unpack("<4sHHHH", d[:12])
+    if magic != b"PALS" or ver != 1 or not nsets or ncolors != 4:
+        raise ValueError(f"{path.name} 调色板头无效：{magic!r}/v{ver}/{nsets}×{ncolors}")
+    if len(d) != 12 + nsets * 2 * ncolors * 2 + count:
+        raise ValueError(f"{path.name} 长度与头部声明不符")
+
+    body = d[12:]
+    per_set = ncolors * 2
+    normal, shiny = [], []
+    for i in range(nsets * 2):
+        o = i * per_set
+        colors = []
+        for c in range(ncolors):
+            (rgb565,) = struct.unpack("<H", body[o + c * 2:o + c * 2 + 2])
+            colors.append(rgb565_hex(rgb565))
+        (normal if i < nsets else shiny).append(colors)
+
+    idx_off = nsets * 2 * per_set
+    per_mon = list(body[idx_off:idx_off + count])
+    if any(i >= nsets for i in per_mon):
+        raise ValueError(f"{path.name} 物种调色板索引越界（完整 uint8，不能截成 4 位）")
+    return {"normal": normal, "shiny": shiny, "perMon": per_mon}
+
+
+def load_front(path: pathlib.Path) -> tuple[dict[int, str], list[dict], int]:
+    """分段图集：三档尺寸各一段，段内定长，每项带显式 id。"""
+    fd = path.read_bytes()
+    magic, ver, nseg = struct.unpack("<4sHH", fd[:8])
+    if magic != b"FRNT":
+        raise ValueError(f"{path.name} magic 不对：{magic!r}")
+
+    segs = []
+    p = 8
+    for _ in range(nseg):
+        size, per, n, doff = struct.unpack("<HHII", fd[p:p + 12])
+        p += 12
+        segs.append((size, per, n, doff))
+
+    base = p
+    sprites: dict[int, str] = {}
+    for size, per, n, doff in segs:
+        q = base + doff
+        for _ in range(n):
+            pid, = struct.unpack("<H", fd[q:q + 2])
+            q += 2
+            sprites[pid] = base64.b64encode(fd[q:q + per]).decode("ascii")
+            q += per
+
+    meta = [{"size": s, "per": pp, "n": n} for s, pp, n, _ in segs]
+    return sprites, meta, len(fd)
+
+
+def load_back(path: pathlib.Path) -> tuple[dict[int, str], int, int]:
+    bd = path.read_bytes()
+    magic, ver, w, h, per, cnt = struct.unpack("<4sHHHHI", bd[:16])
+    if magic != b"BACK":
+        raise ValueError(f"{path.name} magic 不对：{magic!r}")
+
+    sprites: dict[int, str] = {}
+    for i in range(cnt):
+        o = 16 + i * per
+        sprites[i + 1] = base64.b64encode(bd[o:o + per]).decode("ascii")
+    return sprites, w, len(bd)
+
+
+def load_sensing(repo: pathlib.Path) -> dict:
+    """把 data/raw/*.ndjson 跑一遍感知层，打包判定结果供页面可视化。
+
+    页面上能直接对比「单帧 vs 窗口 4」的判定差异 ——
+    这是验收 docs/02-sensing.md#241 那个修复的唯一直观方式。
+    """
+    raw = repo / "data" / "raw"
+    if not raw.is_dir():
+        return {}
+
+    sys.path.insert(0, str(repo / "sim"))
+    try:
+        from sensing import SensingCore, load_ndjson  # noqa: E402
+    except ImportError:
+        return {}
+
+    import collections
+    out: dict[str, dict] = {}
+    for f in sorted(raw.glob("*.ndjson")):
+        scans = load_ndjson(str(f))
+        if not scans:
+            continue
+
+        # 两种窗口各跑一遍，页面上可切换对比
+        runs = {}
+        for w in (1, 4):
+            core = SensingCore(only_24g=True, smooth_window=w)
+            results = core.run(scans)
+            runs[str(w)] = {
+                "rows": [
+                    {"ts": r.ts, "n": r.ap_count, "st": r.state[0],
+                     "d": round(r.distance, 3), "tr": r.transient_aps,
+                     "new": 1 if r.is_new_place else 0}
+                    for r in results
+                ],
+                "trans": core.motion.transitions,
+                "places": len(core.memory.places),
+                "moving": sum(1 for r in results if r.state == "moving"),
+                "biomeDwell": dict(core.memory.biome_dwell),
+            }
+
+        # AP 出现率 —— 一眼看出「稳定核心 + 噪声」的分布
+        counts: collections.Counter = collections.Counter()
+        rssi: dict[str, list[int]] = {}
+        for sc in scans:
+            for ap in sc.only_24g().aps:
+                counts[ap.bssid] += 1
+                rssi.setdefault(ap.bssid, []).append(ap.rssi)
+
+        n = len(scans)
+        aps = [
+            {"b": b[-8:], "ssid": "", "n": c, "pct": round(c / n * 100),
+             "avg": round(sum(rssi[b]) / len(rssi[b]))}
+            for b, c in counts.most_common()
+        ]
+        # 补 SSID（取最后一次见到的）
+        ssid_of = {}
+        for sc in scans:
+            for ap in sc.only_24g().aps:
+                if ap.ssid:
+                    ssid_of[ap.bssid[-8:]] = ap.ssid
+        for a in aps:
+            a["ssid"] = ssid_of.get(a["b"], "")
+
+        out[f.name] = {"scans": n, "runs": runs, "aps": aps,
+                       "span": scans[-1].ts - scans[0].ts}
+    return out
+
+
+def load_systems(repo: pathlib.Path, mons: list[dict]) -> dict:
+    """跑 S1/S2/S3 产出验收数据。
+
+    页面上要能**交互式**验收捕获判定（拖指针、换球、看窗口变化），
+    所以这里导出的是参数与查找表，而非固定结果 —— JS 侧重算一遍，
+    与 Python 实现对照。两边算出同一个数才算验收通过。
+    """
+    sys.path.insert(0, str(repo / "sim"))
+    try:
+        from systems import (  # noqa: E402
+            BALL_FACTOR, BALL_NAME_CN, BAR_WIDTH, BASE_SCALE, FLEE_CHANCE,
+            GEN1_OVERRIDES, POINTER_PERIOD_MS, QUEUE_CAP, STRENGTH_TIERS,
+            WINDOW_MAX, WINDOW_MIN, EncounterAccumulator, auto_battle,
+            effectiveness, species_pool, wild_level, window_width,
+        )
+        from sensing import SensingCore, load_ndjson  # noqa: E402
+        from gameplay import TYPES, PetState  # noqa: E402
+    except ImportError as e:
+        print(f"  注：systems 导入失败（{e}），跳过系统面板", file=sys.stderr)
+        return {}
+
+    stats_sum = {m["id"]: sum(m["st"]) for m in mons}
+
+    # ---- S1：用真实采集数据跑一遍 ----
+    raw = repo / "data" / "raw"
+    queue_rows: list[dict] = []
+    s1_stat = {}
+    if raw.is_dir():
+        scans = []
+        for f in sorted(raw.glob("*.ndjson")):
+            scans += load_ndjson(str(f))
+        scans.sort(key=lambda x: x.ts)
+        if scans:
+            core = SensingCore(only_24g=True)
+            acc = EncounterAccumulator(stats_sum=stats_sum)
+            pet = PetState(species_id=4, type_name="火", mood=78.0)
+            for sc in scans:
+                acc.feed(core.feed(sc), sc.only_24g(), pet)
+
+            pm = mons[3]      # 小火龙
+            for q in acc.queue.items:
+                m = mons[q.species_id - 1]
+                lv = wild_level(q.rarity, 12)
+                b = auto_battle(
+                    [pm["t1"]] + ([pm["t2"]] if pm["t2"] else []), pm["st"], 12,
+                    [m["t1"]] + ([m["t2"]] if m["t2"] else []), m["st"], lv,
+                    pet.ability_factor)
+                queue_rows.append({
+                    "id": q.species_id, "rarity": q.rarity,
+                    "shiny": q.is_shiny, "biome": q.enc.biome,
+                    "transient": q.enc.is_transient, "ts": q.enc.ts,
+                    "lv": lv, "won": b.won, "rounds": len(b.rounds),
+                    "hp": b.wild_hp_ratio, "exp": b.exp,
+                    "labels": [r.label for r in b.rounds if r.label][:3],
+                })
+            s1_stat = {"scans": len(scans), "hunt": acc.hunt_count,
+                       "base": acc.base_count, "dropped": acc.queue.dropped,
+                       "bytes": len(acc.queue.to_bytes()), "cap": QUEUE_CAP}
+
+    # ---- S3：相克表 ----
+    eff = {a: {b: effectiveness(a, [b]) for b in TYPES} for a in TYPES}
+
+    # ---- 物种池分档 ----
+    tiers = []
+    for r in range(1, 6):
+        pool = species_pool(r, stats_sum)
+        tiers.append({"rarity": r, "n": len(pool),
+                      "range": list(STRENGTH_TIERS[r - 1]),
+                      "sample": [mons[i - 1]["zh"] or mons[i - 1]["slug"]
+                                 for i in sorted(pool)[:5]]})
+
+    return {
+        "s1": {"stat": s1_stat, "queue": queue_rows},
+        "s2": {"barWidth": BAR_WIDTH, "period": POINTER_PERIOD_MS,
+               "baseScale": BASE_SCALE, "wmin": WINDOW_MIN, "wmax": WINDOW_MAX,
+               "balls": BALL_FACTOR, "ballNames": BALL_NAME_CN,
+               "flee": {str(k): v for k, v in FLEE_CHANCE.items()}},
+        "s3": {"eff": eff, "types": TYPES,
+               "gen1": [list(x) for x in GEN1_OVERRIDES],
+               "levelDelta": {str(r): wild_level(r, 12) - 12 for r in range(1, 6)}},
+        "tiers": tiers,
+    }
+
+
+def load_systems2(repo: pathlib.Path, mons: list[dict]) -> dict:
+    """S4~S11 的验收数据。
+
+    与 load_systems 同一取向：**导出参数与 Python 实测值，JS 侧重算一遍对照**。
+    页面上每个系统都要能动手推进（推时间、翻页、掉道具、日切、播开场），
+    而不是只看一张静态表 —— 静态表验收不了交互。
+
+    每个 `expect` 字段都是 Python 侧算出的期望值，页面会拿 JS 结果去比。
+    两边不一致就红色报警，这是真的一致性检验，不是装饰。
+    """
+    sys.path.insert(0, str(repo / "sim"))
+    try:
+        import gameplay as GP                              # noqa: E402
+        import intro as IN                                 # noqa: E402
+        from gameplay import PetState                      # noqa: E402
+        from state import (                                # noqa: E402
+            BIOME_ORDER, DEX_BYTES, ITEM_CAPS, TREND_DAYS,
+            DailyCounters, Dex, DualBufferSave, Inventory, Records, SaveData,
+        )
+        from systems import (                              # noqa: E402
+            SHINY_DENOM, SHINY_DENOMINATORS, STONE_BIOME, STONE_DWELL_SECONDS, TRADE_EXPLORE_MULT,
+            TRADE_INTIMACY, TRIGGER_ITEM, TRIGGER_LEVEL_UP, TRIGGER_TRADE,
+            check_evolution, do_evolve,
+        )
+    except ImportError as e:
+        print(f"  注：S4-S11 导入失败（{e}），跳过", file=sys.stderr)
+        return {}
+
+    # ---- S4 养成：跑一条 72 小时无照料曲线 ----
+    # 页面滑块会重算同一条，对照两边的 satiety/mood/stamina。
+    #
+    # 注意 advance() 首次调用只设时间基准点就返回（不知起点无法算 delta），
+    # 所以必须先 advance(0) 立基准，再 advance(h*3600)。
+    # 我第一版漏了这步，整条曲线是平的 —— 80/70/90 一动不动。
+    curve = []
+    for h in range(0, 73, 6):
+        p = PetState(species_id=4, type_name="火")
+        p.advance(0)                       # 立基准
+        p.advance(h * 3600)
+        curve.append({"h": h, "sat": round(p.satiety, 1), "mood": round(p.mood, 1),
+                      "stam": round(p.stamina, 1), "low": p.is_despondent,
+                      "af": round(p.ability_factor, 3),
+                      "cw": round(p.catch_window_bonus, 3)})
+    # 「不照料多久会饿到底」—— S4 那条「一天一次不够」推算的复核
+    zero_h = next((c["h"] for c in curve if c["sat"] <= 0), None)
+
+    s4 = {
+        "decay": {"sat": GP.SATIETY_DECAY_PER_HOUR, "mood": GP.MOOD_DECAY_PER_HOUR,
+                  "stamRec": GP.STAMINA_RECOVER_PER_HOUR,
+                  "stamCost": GP.STAMINA_COST_PER_MOTION_EVENT},
+        "low": GP.LOW_THRESHOLD, "penalty": GP.DESPONDENT_PENALTY,
+        "bucket": GP.TIME_BUCKET_SECONDS,
+        "curve": curve, "satZeroHour": zero_h,
+    }
+
+    # ---- S5 图鉴：用 S1 队列的真实捕获建一份图鉴 ----
+    dex = Dex()
+    for m in mons[:47]:            # 造一份「已收 47 只」的样本，够翻满 3 页
+        dex.mark_caught(m["id"], shiny=(m["id"] % 37 == 0))
+    for sid in (52, 63, 92, 130, 151):
+        dex.mark_seen(sid)         # 见过没抓到 —— 剪影 + seen 标记要能区分
+    s5 = {
+        "bytes": len(dex.to_bytes()), "dexBytes": DEX_BYTES,
+        "pages": dex.pages, "perPage": 20,
+        "caught": dex.count("caught"), "seen": dex.count("seen"),
+        "shinyCaught": dex.count("shiny_caught"),
+        # 位图导出为 base64，页面自己解位 —— 与固件同一份数据
+        "bits": {k: base64.b64encode(bytes(getattr(dex, k))).decode()
+                 for k in ("seen", "caught", "shiny_seen", "shiny_caught")},
+    }
+
+    # ---- S6 存档：真实字节布局 + 双 buffer ----
+    sd = SaveData()
+    sd.dex = dex
+    blob = sd.to_bytes()
+    dual = DualBufferSave()
+    dual.save(sd)
+    dual.save(sd)
+    ok_blob, src = dual.load()
+    # 注入损坏：翻主槽一个 bit，应当回退到备份槽
+    broken = bytearray(dual.slots[dual.active])
+    broken[40] ^= 0xFF
+    dual.slots[dual.active] = bytes(broken)
+    _, src_after = dual.load()
+    s6 = {
+        "total": len(blob), "dual": len(blob) * 2,
+        "layout": [
+            {"n": "魔数+版本+CRC", "b": 10},
+            {"n": "主宠（9 字段）", "b": 9},
+            {"n": "图鉴 4 位图", "b": len(dex.to_bytes())},
+            {"n": "背包 4 种", "b": len(sd.inventory.to_bytes())},
+            {"n": "成绩纪录", "b": len(sd.records.to_bytes())},
+            {"n": "biome 驻留 5×u32", "b": 20},
+            {"n": "day_index", "b": 2},
+        ],
+        "verifyGood": SaveData.verify(blob),
+        "verifyBroken": SaveData.verify(bytes(broken)),
+        "srcBefore": src, "srcAfter": src_after,
+        "placeTable": 512, "queue": 128,
+    }
+
+    # ---- S7 进化：三种触发各取样本 + 交互判定的期望值 ----
+    evo_samples = []
+    for m in mons:
+        if not m["evo"] or not m["trig"]:
+            continue
+        trig = {"升级": TRIGGER_LEVEL_UP, "道具": TRIGGER_ITEM,
+                "交换": TRIGGER_TRADE}.get(m["trig"])
+        if trig is None:
+            continue
+        evo_samples.append({
+            "id": m["id"], "zh": m["zh"] or m["slug"], "to": m["evo"],
+            "toZh": mons[m["evo"] - 1]["zh"] or mons[m["evo"] - 1]["slug"],
+            "trig": m["trig"], "trigCode": trig, "lv": m["lv"],
+            "needInt": m["lv"] * 1.0 if trig == TRIGGER_LEVEL_UP else (
+                TRADE_INTIMACY if trig == TRIGGER_TRADE else 0),
+            "needExp": m["lv"] * 2 if trig == TRIGGER_LEVEL_UP else (
+                m["lv"] * TRADE_EXPLORE_MULT if trig == TRIGGER_TRADE else 0),
+            "biome": STONE_BIOME.get(_stone_of(m), "") if trig == TRIGGER_ITEM else "",
+        })
+
+    # 判定探针：每条都带 **期望值**，页面用它比对。
+    #
+    # 没有期望值的探针验收不了任何东西 —— 「2/6 通过」既可能是设计如此，
+    # 也可能是实现坏了，看不出区别。带上 want 之后，红色就一定是 bug。
+    #
+    # 探针必须**隔离出要测的那一条**：测驻留就得先让 intimacy/explore 达标，
+    # 否则 check_evolution 在亲密度那步就返回了，根本走不到驻留判定。
+    # 我第一版皮卡丘给了 intimacy 50（通用门槛 60），两条驻留探针都卡在
+    # 亲密度上，看起来「驻留判定没生效」，其实是探针没构造对。
+    def _probe(sid: int, inti: float, expl: int, dwell: dict,
+               want: bool, note: str) -> dict:
+        m = mons[sid - 1]
+        trig = {"升级": TRIGGER_LEVEL_UP, "道具": TRIGGER_ITEM,
+                "交换": TRIGGER_TRADE}[m["trig"]]
+        p = PetState(species_id=sid, type_name=m["t1"])
+        p.intimacy, p.explore_value = inti, expl
+        c = check_evolution(p, trig, m["evo"], m["lv"],
+                            biome_dwell=dwell, item_hint=_stone_of(m))
+        return {"id": sid, "zh": m["zh"] or m["slug"], "trig": m["trig"],
+                "inti": inti, "expl": expl,
+                "dwell": {k: v // 3600 for k, v in dwell.items()},
+                "ok": c.can, "why": c.reason,
+                "want": want, "pass": c.can == want, "note": note,
+                "needInt": c.need_intimacy, "needExp": c.need_explore,
+                "needBiome": c.need_biome}
+
+    probes = [
+        # 升级触发：妙蛙种子 @16 → 需 intimacy 60、explore 32
+        _probe(1, 65, 40, {}, True, "升级线达标"),
+        _probe(1, 20, 40, {}, False, "亲密度不足 → 拦住"),
+        _probe(1, 65, 20, {}, False, "探索值不足（20/32）→ 拦住"),
+        # 交换触发：勇基拉 需 intimacy 90（高门槛单机替代）
+        _probe(64, 65, 40, {}, False, "交换线门槛更高，65 不够"),
+        _probe(64, 95, 200, {}, True, "交换线达标"),
+        # 道具触发：皮卡丘 需办公区驻留 6h。
+        # 前两条先让 intimacy/explore 达标，才测得到驻留这一条。
+        _probe(25, 65, 40, {"办公区": 6 * 3600}, True, "驻留 6h 达标"),
+        _probe(25, 65, 40, {"办公区": 3600}, False, "驻留仅 1h → 拦住"),
+        _probe(25, 65, 40, {"住宅区": 9 * 3600}, False, "驻留够但 biome 不对"),
+    ]
+
+    # 进化后不清零的证据
+    pe = PetState(species_id=1, type_name="草")
+    pe.intimacy, pe.explore_value, pe.mood = 70.0, 40, 60.0
+    er = do_evolve(pe, 2, "草", 32)
+    s7 = {
+        "samples": evo_samples,
+        "counts": {k: sum(1 for e in evo_samples if e["trig"] == k)
+                   for k in ("升级", "道具", "交换")},
+        "stoneBiome": STONE_BIOME, "dwellSec": STONE_DWELL_SECONDS,
+        "tradeInt": TRADE_INTIMACY, "tradeMult": TRADE_EXPLORE_MULT,
+        "probes": probes,
+        "afterEvolve": {"inti": pe.intimacy, "expl": pe.explore_value,
+                        "mood": pe.mood, "frames": len(er.frames)},
+    }
+
+    # ---- S8 闪光 ----
+    s8 = {"denom": SHINY_DENOM, "sources": SHINY_DENOMINATORS,
+          "expect1": round((1 - (1 - 1 / SHINY_DENOM) ** 100) * 100, 2),
+          "expect500": round((1 - (1 - 1 / SHINY_DENOM) ** 500) * 100, 1)}
+
+    # ---- S9 道具：掉落规则 + 切球跳空 ----
+    inv = Inventory()
+    drops = []
+    for r in range(1, 6):
+        i2 = Inventory(poke=0, great=0, ultra=0, berry=0)
+        drops.append({"rarity": r, "normal": i2.drop_from_encounter(r),
+                      "newPlace": Inventory(poke=0, great=0, ultra=0, berry=0)
+                      .drop_from_encounter(r, is_new_place=True)})
+    # 切球跳空：只有精灵球时循环应停在 poke
+    only_poke = Inventory(poke=5, great=0, ultra=0)
+    s9 = {
+        "caps": ITEM_CAPS, "drops": drops,
+        "skipEmpty": {"from_poke": only_poke.next_ball("poke"),
+                      "from_great": only_poke.next_ball("great")},
+        "bytes": len(inv.to_bytes()),
+    }
+
+    # ---- S10 成绩：跑 14 天日切 ----
+    rec = Records()
+    days = []
+    import random as _rnd
+    rr = _rnd.Random(20260901)
+    for d in range(1, 15):
+        dc = DailyCounters(encounters=rr.randint(4, 30), captures=rr.randint(0, 8),
+                           motion_events=rr.randint(0, 40),
+                           new_places=rr.randint(0, 2),
+                           cared=rr.random() > 0.15, went_out=rr.random() > 0.3)
+        broken = rec.roll_day(d, dc, intimacy=d * 5)
+        days.append({"d": d, "enc": dc.encounters, "cap": dc.captures,
+                     "mot": dc.motion_events, "newp": dc.new_places,
+                     "cared": dc.cared, "out": dc.went_out,
+                     "broken": broken, "careStreak": rec.care_streak,
+                     "outStreak": rec.out_streak})
+    s10 = {
+        "days": days, "bytes": len(rec.to_bytes()), "trendDays": TREND_DAYS,
+        "biomeOrder": BIOME_ORDER,
+        "final": {"bestEnc": rec.best_encounters, "bestMot": rec.best_motion,
+                  "bestNew": rec.best_new_places,
+                  "careStreak": rec.longest_care_streak,
+                  "outStreak": rec.longest_out_streak,
+                  "totalEnc": rec.total_encounters, "days": rec.total_days},
+    }
+
+    # ---- S11 开场：帧序列 + 选择状态机 ----
+    seq = IN.boot_sequence()
+    sounds = [{"f": i + 1, "s": f.sound, "y": f.logo_y}
+              for i, f in enumerate(seq) if f.sound]
+    s11 = {
+        "scrollSteps": IN.SCROLL_STEPS, "sound1": IN.SOUND_STEP_1,
+        "sound2": IN.SOUND_STEP_2, "settle": IN.SETTLE_PAUSE_STEPS,
+        "logo": {"w": IN.LOGO_W, "h": IN.LOGO_H, "x": IN.LOGO_X,
+                 "y0": IN.LOGO_Y_START, "y1": IN.LOGO_Y_END},
+        "frames": len(seq), "sounds": sounds,
+        "ys": [f.logo_y for f in seq],
+        "starters": IN.STARTERS, "ballY": IN.BALL_Y, "ballXs": list(IN.BALL_XS),
+        "pika": list(IN.PIKA_POS),
+        "cursorDx": IN.CURSOR_OFFSET_X, "cursorDy": IN.CURSOR_OFFSET_Y,
+        "level": IN.STARTER_LEVEL, "items": IN.STARTER_ITEMS,
+        "results": [IN.apply_choice(i) for i in range(len(IN.STARTERS))],
+    }
+
+    # ---- S13 音频 ----
+    # 导出**音序数据**而非 WAV：页面用 WebAudio 现场合成，
+    # 与固件同一份数据、同一套公式。塞 WAV 进 HTML 要 150 KB 且
+    # 验收不了「固件也能算出同样的声音」。
+    try:
+        import audio as AU                     # noqa: E402
+        sfx = {}
+        for name, fn in AU.SFX.items():
+            tracks = []
+            for t in fn():
+                tracks.append({
+                    "kind": t.kind, "short": t.noise_short,
+                    "notes": [{"m": x.midi, "d": x.dur_ms, "duty": x.duty,
+                               "e0": x.env.start, "es": x.env.step,
+                               "ems": x.env.step_ms,
+                               "sw": x.sweep, "v": x.vol}
+                              for x in t.notes],
+                })
+            sfx[name] = tracks
+        bud = AU.budget()
+        # 每条的实测峰值/直流/RMS —— 页面用 JS 重算后比对
+        metrics = {}
+        for name, fn in AU.SFX.items():
+            buf = AU.render(fn())
+            if not buf:
+                continue
+            pk = max(abs(v) for v in buf)
+            dc = sum(buf) / len(buf)
+            rms = (sum(v * v for v in buf) / len(buf)) ** 0.5
+            metrics[name] = {"peak": round(pk, 4), "dc": round(dc, 5),
+                             "rms": round(rms, 4), "n": len(buf)}
+        s13 = {
+            "sfx": sfx, "budget": bud, "metrics": metrics,
+            "sr": AU.SAMPLE_RATE, "duties": list(AU.DUTIES),
+            "master": AU.MASTER_VOL, "wave": AU.WAVE_TRIANGLE,
+            "bytesPerNote": AU.BYTES_PER_NOTE,
+        }
+    except ImportError as e:
+        print(f"  注：audio 导入失败（{e}）", file=sys.stderr)
+        s13 = {}
+
+    # ---- S14 队伍与仓库 ----
+    # 这个系统补的是一个**真断层**：在它之前 attempt_capture() 成功后
+    # 只点亮图鉴 bit，实体就消失了 —— 玩家抓三十只能玩的还是开场那只。
+    try:
+        import party as PT                      # noqa: E402
+        from systems import resolve_capture     # noqa: E402
+
+        pt = PT.Party()
+        pt.receive(PT.Mon(species_id=25, level=12, intimacy=40))
+        # 造一串收容样本，看断层是否真的接上。
+        # 不用 load_systems 里那份真实队列 —— 那是另一个函数的局部变量，
+        # 跨函数取会把两个面板的数据耦在一起（我第一版就是这么写的，NameError）。
+        from systems import wild_level          # noqa: E402
+        demo_log = []
+        for sid, rar in [(19, 1), (16, 1), (10, 2), (63, 3), (95, 3),
+                         (143, 4), (131, 4), (149, 5), (19, 1), (150, 5)]:
+            lv = wild_level(rar)
+            before_party = len(pt.party)
+            ok, note, vic = pt.receive(PT.Mon(species_id=sid, level=lv,
+                                              shiny=(sid == 63)))
+            demo_log.append({
+                "id": sid, "rarity": rar, "lv": lv, "ok": ok, "note": note,
+                "where": "队伍" if len(pt.party) > before_party else "仓库",
+                "party": len(pt.party), "box": len(pt.box),
+            })
+
+        # 同物种相遇时留哪只 —— 仓库改 151 格后这才是关键规则。
+        #
+        # 旧面板展示的是「仓库满时替换谁」，那个场景现在不存在了
+        # （按物种号索引，永远有位置）。改成展示 better() 的三条判据。
+        def _dup_case(label: str, old_kw: dict, new_kw: dict) -> dict:
+            p2 = PT.Party()
+            for _ in range(PT.PARTY_MAX):
+                p2.receive(PT.Mon(species_id=1, level=50))
+            p2.receive(PT.Mon(species_id=25, **old_kw))
+            before = p2.box[25]
+            ok, note, vic = p2.receive(PT.Mon(species_id=25, **new_kw))
+            kept = p2.box[25]
+            return {
+                "case": label, "ok": ok, "note": note,
+                "old": {"lv": before.level, "shiny": before.shiny},
+                "new": {"lv": new_kw.get("level", 5),
+                        "shiny": new_kw.get("shiny", False)},
+                "kept": {"lv": kept.level, "shiny": kept.shiny},
+            }
+
+        dup_cases = [
+            _dup_case("新的等级更高", {"level": 10}, {"level": 30}),
+            _dup_case("新的等级更低", {"level": 30}, {"level": 5}),
+            _dup_case("新的是闪光（低级）", {"level": 40},
+                      {"level": 5, "shiny": True}),
+            _dup_case("旧的是闪光", {"level": 5, "shiny": True},
+                      {"level": 50}),
+        ]
+
+        s14 = {
+            "partyMax": PT.PARTY_MAX, "boxSpecies": PT.BOX_SPECIES,
+            "boxCols": PT.BOX_COLS, "boxRows": PT.BOX_ROWS,
+            "boxPages": PT.BOX_PAGES,
+            "monBytes": PT.MON_BYTES, "bytes": PT.SERIALIZED_BYTES,
+            "log": demo_log,
+            "party": [{"id": m.species_id, "lv": m.level, "hp": m.hp,
+                       "shiny": m.shiny, "inti": m.intimacy}
+                      for m in pt.party],
+            "box": [{"id": m.species_id, "lv": m.level, "hp": m.hp,
+                     "shiny": m.shiny}
+                    for m in (pt.box[k] for k in sorted(pt.box))],
+            "dups": pt.duplicates(),
+            "dupCases": dup_cases,
+            # 三键菜单随上下文变 —— 不给无效选项
+            "menus": {
+                "party_first": PT.PartyBrowser(view=PT.VIEW_PARTY,
+                                               cursor=0).actions(pt),
+                "party_other": PT.PartyBrowser(view=PT.VIEW_PARTY,
+                                               cursor=1).actions(pt),
+                "box": PT.PartyBrowser(view=PT.VIEW_BOX, cursor=0).actions(pt),
+            },
+        }
+    except ImportError as e:
+        print(f"  注：party 导入失败（{e}）", file=sys.stderr)
+        s14 = {}
+
+    # ---- S15 转场与出场动画 ----
+    # 参数全部来自 pret 反汇编。页面上要能**逐帧步进**看，
+    # 否则「闪光是不是真的沿圆周逐个点亮」这种事根本验不了。
+    try:
+        import transitions as TR                # noqa: E402
+        s15 = {
+            "shiny": {
+                "stars": [{"i": x.index, "frame": x.frame, "dx": x.dx,
+                           "dy": x.dy, "deg": x.angle_deg, "big": x.big}
+                          for x in TR.shiny_stars()],
+                "total": TR.SHINY_TOTAL_FRAMES,
+                "life": TR.SHINY_STAR_LIFE,
+                "step": TR.SHINY_STEP_FRAMES,
+                "radius": TR.SHINY_RADIUS,
+                "tail": TR.SHINY_TAIL_FRAMES,
+                "flashes": TR.SHINY_BGP_FLASHES,
+                "flashFrames": TR.SHINY_BGP_FLASH_FRAMES,
+                "phase": TR.SHINY_PHASE,
+                "gen2Denom": TR.GEN2_SHINY_DENOM,
+                # 逐帧状态**不全传** —— 64 帧 × 8 颗星的完整状态是 17 KB，
+                # 而 JS 用同样的公式一算就有。只传抽样帧供比对。
+                "frameCheck": [
+                    {"f": f, **{k: v for k, v in TR.shiny_frame_state(f).items()
+                                if k != "stars"},
+                     "lit": [x["i"] for x in TR.shiny_frame_state(f)["stars"]]}
+                    for f in (1, 5, 13, 21, 29, 40, 48, 50, 64, 65)
+                ],
+            },
+            "transitions": TR.TRANSITIONS,
+            "openBiomes": list(TR.OPEN_BIOMES),
+            "grid": {"w": TR.GRID_W, "h": TR.GRID_H, "tile": TR.TILE},
+            # 转场 mask **不传** —— 它是纯几何，JS 自己算就行。
+            # 我第一版传了 8 种 × 5 个进度快照的 30×40 网格 = 53 KB，
+            # 占了整个 s15 payload 的七成，而那些数据 JS 一行公式就能生成。
+            # 只传几个校验点，让 JS 算完能对一下。
+            "maskCheck": {
+                name: [
+                    {"p": pr,
+                     "filled": sum(sum(1 for c in row if c)
+                                   for row in TR.transition_mask(name, pr))}
+                    for pr in (0.25, 0.5, 0.75, 1.0)
+                ]
+                for name in TR.TRANSITIONS
+            },
+            "pickTable": [
+                {"trainer": t, "strong": st, "biome": b,
+                 "name": TR.pick_transition(t, 20 if st else 10, 12, b)[0],
+                 "idx": TR.pick_transition(t, 20 if st else 10, 12, b)[1]}
+                for t in (False, True) for st in (False, True)
+                for b in ("野外", "办公区")
+            ],
+            "evolve": {
+                "rounds": TR.evolution_rounds(),
+                "timeline": TR.evolution_timeline(),
+                "blinkFrames": TR.evolution_blink_frames(),
+                "totalFrames": TR.evolution_total_frames(),
+                "preWait": TR.EVOLVE_PRE_WAIT,
+                "silhouette": TR.EVOLVE_SILHOUETTE,
+                "audio": TR.EVOLVE_AUDIO,
+            },
+            "budget": TR.budget(),
+        }
+    except ImportError as e:
+        print(f"  注：transitions 导入失败（{e}）", file=sys.stderr)
+        s15 = {}
+
+    # ---- 开场用的像素素材（精灵球 / 手指 / 星光）----
+    # 验收截图暴露画风打架：canvas 矢量圆没有台阶感，而周围一切都有。
+    # 改成与 sprite 同一套 2bpp 点阵路径。
+    try:
+        import pixelart as PA                  # noqa: E402
+        ball_ui = _ui_assets()
+        def ball_grid(name):
+            item = ball_ui[name]
+            stride = (item["w"] + 3) // 4
+            return [[(item["bytes"][y * stride + x // 4] >> (6 - (x % 4) * 2)) & 3
+                     for x in range(item["w"])] for y in range(item["h"])]
+        art_budget = PA.budget()
+        art_budget["per"]["ball_24"] = len(ball_ui["ball_24"]["bytes"])
+        art_budget["per"]["ball_24_open"] = len(ball_ui["ball_open"]["bytes"])
+        art_budget["total"] = sum(art_budget["per"].values())
+        art = {
+            "ball": ball_grid("ball_24"),
+            "ballOpen": ball_grid("ball_open"),
+            "cursor": PA.CURSOR,
+            "stars": {str(sz): PA.star(sz) for sz in PA.STAR_SIZES},
+            "pal": {"ball": ball_ui["ball_24"]["palette"], "ballOpen": ball_ui["ball_open"]["palette"],
+                    "cursor": PA.CURSOR_PALETTE, "star": PA.STAR_PALETTE},
+            "budget": art_budget,
+        }
+    except ImportError as e:
+        print(f"  注：pixelart 导入失败（{e}）", file=sys.stderr)
+        art = {}
+
+    return {"s4": s4, "s5": s5, "s6": s6, "s7": s7,
+            "s8": s8, "s9": s9, "s10": s10, "s11": s11, "s13": s13,
+            "s14": s14, "s15": s15, "art": art}
+
+
+def load_playthrough(repo: pathlib.Path, mons: list[dict]) -> dict:
+    """导出完整流程日志 —— 试玩后台（时间线 + 单步）的数据源。
+
+    这是**唯一消费 `orchestrate.play_through()` 的地方**。
+    其余十个 tab 都是单系统面板，各自造自己的输入；
+    这里跑的是 19 个系统同时工作的真实流程，所以它也是系统接缝
+    唯一会在验收平台上被看到的地方。
+
+    ## 为什么导出多个「跑法」而不是一个
+
+    单跑一次只能看「发生了什么」，看不出「参数改了会怎样」。
+    而这个项目最需要验证的恰恰是后者 —— 比如按键时机：
+    `press_offset_ms` 从 300 改到 600，捕获数从 36 掉到 3
+    （指针周期 1200ms，600 落在三角波顶点，永远打不中窗口）。
+    这种事只有并排放着才看得出来。
+
+    每个跑法都带完整日志，前端可以时间线展开、单步回放、互相对比。
+    """
+    sim = repo / "sim"
+    if str(sim) not in sys.path:
+        sys.path.insert(0, str(sim))
+    try:
+        import orchestrate as O          # noqa: E402
+        from prototype import synthetic_scans   # noqa: E402
+        from sensing import load_ndjson  # noqa: E402
+    except ImportError as e:
+        print(f"⚠️  试玩数据不可用（{e}）", file=sys.stderr)
+        return {}
+
+    zh = {m["id"]: m.get("zh") or m.get("slug", "") for m in mons}
+
+    # 真实采集：三份按时间拼起来 —— 与 docs/00-handoff.md 的验证命令同一份输入
+    real: list = []
+    for f in ("home", "commute", "office"):
+        p = repo / "data" / "raw" / f"{f}.ndjson"
+        if p.exists():
+            real += load_ndjson(str(p))
+    real.sort(key=lambda x: x.ts)
+
+    # 跑法定义。real 只有 19.9 小时（跨 1 天），照料/日切/道馆几乎不触发，
+    # 所以另配合成数据的多天跑法 —— 两者各自能看到不同的东西。
+    runs_def = [
+        {"key": "real", "label": "真实采集 19.9h",
+         "note": "data/raw/ 三份拼接。跨 1 天，看得到 biome 判定与存档分布，"
+                 "但照料只触发 1 次、日切 1 次",
+         "scans": real, "off": 300, "jit": 0},
+        {"key": "real_worst", "label": "真实采集（按键最差相位）",
+         "note": "同上但 press_offset_ms=600 —— 指针周期的半程，"
+                 "落在三角波顶点。对比 real 能看出按键时机的全部影响",
+         "scans": real, "off": 600, "jit": 0},
+        {"key": "syn7", "label": "合成 7 天",
+         "note": "prototype.synthetic_scans(7)。AP 分布照 data/raw/ 实测调过。"
+                 "看得到照料节律、日切结算、纪录刷新",
+         "scans": synthetic_scans(7) if real is not None else [],
+         "off": 300, "jit": 80},
+        {"key": "syn30", "label": "合成 30 天",
+         "note": "长线：图鉴增长曲线、仓库溢出、连续照料纪录",
+         "scans": synthetic_scans(30), "off": 300, "jit": 80},
+    ]
+
+    runs = []
+    for d in runs_def:
+        if not d["scans"]:
+            continue
+        s = O.play_through(d["scans"], choice=3,
+                           press_offset_ms=d["off"], press_jitter_ms=d["jit"])
+        sm = O.summary(s)
+        log = [{"ts": e.ts, "kind": e.kind, "text": e.text,
+                "detail": _jsonable(e.detail)} for e in s.log]
+        # 按 kind 计数 —— 前端的筛选器与「哪些系统真的被调到了」检查
+        kinds: dict[str, int] = {}
+        for e in log:
+            kinds[e["kind"]] = kinds.get(e["kind"], 0) + 1
+        runs.append({
+            "key": d["key"], "label": d["label"], "note": d["note"],
+            "scans": len(d["scans"]),
+            "pressOffset": d["off"], "pressJitter": d["jit"],
+            "summary": _jsonable(sm), "log": log, "kinds": kinds,
+            "t0": log[0]["ts"] if log else 0,
+            "t1": log[-1]["ts"] if log else 0,
+        })
+
+    # 19 个系统里哪些在流程中真的被日志记到了 —— 孤岛检查。
+    # 上一轮串联发现过 8 个模块「只被 build.py 读参数，编排层从不调用」，
+    # 这份映射让它在验收平台上可见，而不用再靠人去 grep。
+    kind_to_system = {
+        "boot": "S15 转场", "story": "S16 开场", "choose": "S16 开场",
+        "place": "S1 感知/地点", "biome": "S1 感知/biome",
+        "encounter": "S1 遭遇累积", "battle": "S3 自动战斗",
+        "capture": "S2 捕获判定", "item": "S9 道具",
+        "transition": "S15 转场", "care": "S4 养成",
+        "day": "S10 成绩", "save": "S18 自动存档",
+        "gym": "S17 道馆", "evolve": "S7 进化", "shiny": "S8 闪光",
+        "name": "S12 取名", "party": "S14 队伍",
+    }
+    seen_kinds: set = set()
+    for r in runs:
+        seen_kinds |= set(r["kinds"])
+    coverage = sorted({kind_to_system.get(k, f"(未映射: {k})")
+                       for k in seen_kinds})
+    never = sorted({v for k, v in kind_to_system.items()
+                    if k not in seen_kinds})
+
+    return {"runs": runs, "zh": zh,
+            "kindMap": kind_to_system,
+            "coverage": coverage, "neverLogged": never}
+
+
+def _jsonable(o):
+    """把 dataclass / set / 元组键的 dict 压成能 json 化的形状。
+
+    Session 的 detail 里混着这些 —— 直接 json.dumps 会炸。
+    """
+    if isinstance(o, dict):
+        return {str(k): _jsonable(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_jsonable(v) for v in o]
+    if isinstance(o, set):
+        return sorted(_jsonable(v) for v in o)
+    if isinstance(o, (str, int, float, bool)) or o is None:
+        return o
+    return str(o)
+
+
+# 进化石反查：gen1.bin 只存「道具触发」，具体哪块石头要按物种查。
+_STONES = {
+    26: "thunder-stone", 36: "moon-stone", 40: "moon-stone",
+    38: "fire-stone", 78: "fire-stone", 59: "fire-stone",
+    62: "water-stone", 73: "water-stone", 87: "water-stone",
+    91: "water-stone", 121: "water-stone", 134: "water-stone",
+    135: "thunder-stone", 136: "fire-stone",
+    45: "leaf-stone", 71: "leaf-stone", 103: "leaf-stone",
+}
+
+
+def _stone_of(m: dict) -> str:
+    """该物种进化用哪块石头。按**进化后**的 id 查（表里存的是结果形态）。"""
+    return _STONES.get(m.get("evo", 0), "fire-stone")
+
+
+
+
+# ---------------------------------------------------------------------------
+# 页面模拟器数据（P0~P8 按键驱动逐帧模拟）
+#
+# 关键约束：**全部数值由 sim/ 现算导出**，不在 JS 里重实现 —— sim 是
+# 十二门禁的对账基准，web 若自己算会出现「web 好看、固件不同、门禁
+# 全绿」的三方不一致。web 只做两件事：播放/单帧步进导出的帧数据、
+# 按 sim 文档的按键语义在帧数据之间跳转。
+# 门禁 verify_sim_pages.py 会拿这里的产物与 sim 直算对照。
+# ---------------------------------------------------------------------------
+
+def _ui_assets() -> dict:
+    """ui.bin 的条目 + 各自调色板（调色板来自 pixelart 常量，
+    与固件写死的那份同源）。"""
+    import pixelart as pa
+    sys.path.insert(0, str(REPO / "tools" / "pipeline"))
+    import fetch_oak
+    import fetch_balls
+    path = REPO / "assets" / "ui.bin"
+    data = path.read_bytes()
+    if len(data) < 8:
+        raise ValueError("ui.bin 头部截断")
+    magic, ver, count = struct.unpack_from("<4sHH", data, 0)
+    fmt, esize = "<16sBBIHH", struct.calcsize("<16sBBIHH")
+    base = 8 + count * esize
+    pals = {
+        **fetch_balls.BALL_PALETTES,
+        "cursor": pa.MENU_CURSOR_PALETTE, "heart": pa.HEART_PALETTE,
+        "star_5": pa.STAR_PALETTE, "star_7": pa.STAR_PALETTE,
+        "oak": fetch_oak.OAK_PALETTE,  # Fixed Crystal RGB5, exact LCD RGB565 expansion.
+    }
+    if magic != b"UIA1" or ver != 1 or base > len(data):
+        raise ValueError("ui.bin 头部或条目表无效")
+    out = {}
+    for i in range(count):
+        name, w, h, off, ln, _ = struct.unpack_from(fmt, data, 8 + i * esize)
+        nm = name.rstrip(b"\0").decode()
+        if nm not in pals or nm in out or not w or not h or ln != ((w + 3) // 4) * h or base + off + ln > len(data):
+            raise ValueError(f"ui.bin 条目 {nm!r} 无效或缺少明确调色板")
+        # 调成 sprite 序（0=最暗 3=最亮）—— canvas 渲染统一按这个
+        pal = pals[nm]
+        if nm == "oak" or nm in fetch_balls.BALL_PALETTES:
+            sprite_pal = pal          # Original Crystal art uses engine shade order.
+        else:
+            sprite_pal = [pal[0], pal[2], pal[1], pal[3]]  # pixelart→sprite 序
+        out[nm] = {"w": w, "h": h,
+                   "bytes": list(data[base + off: base + off + ln]),
+                   "palette": sprite_pal}
+    if set(out) != set(pals):
+        raise ValueError(f"ui.bin 缺少条目：{sorted(set(pals) - set(out))}")
+    return out
+
+
+def _move_types() -> dict:
+    """招式→属性（99 条，读 assets/moves.bin 经 sim/systems._load_moves）。
+    web 侧招式动画的属性兜底派发用 —— 数值全部现算，不手抄。"""
+    try:
+        sys.path.insert(0, str(HERE / ".." / "sim"))
+        from systems import _load_moves
+        return {m["zh"]: m["type"] for m in _load_moves()["moves"]}
+    except Exception as e:  # 读不到时空表 —— web 退回 '*' 默认动画
+        print(f"  ⚠️ moveTypes 跳过：{e}", file=sys.stderr)
+        return {}
+
+
+def sim_pages_payload() -> dict:
+    sys.path.insert(0, str(REPO / "sim"))
+    import strings
+    import opening as OP
+    import systems as S
+    import gameplay as G
+    import effects as E
+    import party as PT
+
+    # ---- 提示行（KEYS 同源，不硬写）----
+    pages_keys = {p: dict(ks) for p, ks in strings.KEYS.items()}
+    hints = {}
+    for p, ks in strings.KEYS.items():
+        line = " ".join(f"[{k}]{a}" for k, a in ks.items())
+        hints[p] = {"line": line, "px": strings.text_px(line),
+                    "pxFixed": strings.text_px_fixed(line)}
+
+    # ---- P0 开场：逐帧状态（OpeningFlow 现算）----
+    boxes = []
+    for b, bo in enumerate(OP.SCRIPT):
+        fl = OP.OpeningFlow()
+        fl.box = b
+        frames = []
+        while fl.typing:
+            frames.append([fl.typed, fl.frame, 1 if fl.typing else 0])
+            fl.tick()
+        frames.append([fl.typed, fl.frame, 0])
+        boxes.append({"lines": list(bo.lines), "fullLen": fl.full_len,
+                      "showMon": bo.show_mon, "showOak": bo.show_oak,
+                      "pauseAfter": bo.pause_after, "frames": frames})
+    opening = {"boxes": boxes, "totalFrames": OP.total_frames(),
+               "typeFramesPerChar": OP.TYPE_FRAMES_PER_CHAR,
+               "boxAppearFrames": OP.BOX_APPEAR_FRAMES}
+
+    # ---- P3 战斗：两个确定性剧本（auto_battle 现算）----
+    mons25 = None
+    scenarios = []
+    for label, wild_sid, plv, wlv, seed, pst, wst in (
+            # 皮卡丘 Lv12 vs 小拉达 Lv5（稳赢）/ Lv5 vs 大岩蛇 Lv20（电系无效）
+            ("win", 19, 12, 5, 7, [35, 55, 40, 50, 90], [30, 56, 35, 25, 72]),
+            ("lose", 95, 5, 20, 11, [35, 55, 40, 50, 90], [35, 45, 160, 30, 70]),
+    ):
+        res = S.auto_battle(
+            pet_types=["电"], pet_stats=pst, pet_level=plv,
+            wild_types=["一般"] if wild_sid == 19 else ["岩石", "地面"],
+            wild_stats=wst,
+            wild_level=wlv, pet_species=25, wild_species=wild_sid, seed=seed)
+        scenarios.append({
+            "label": label, "playerLevel": plv, "wildLevel": wlv,
+            "wildSid": wild_sid,
+            # HP 上限 —— auto_battle 同一行代码：effective_stat(base, lv)*2 + lv。
+            # 旧值 pst[0] 是种族值 HP 档（量纲不同），配实战 petHp 出过
+            # 「86/35」这种 cur>max（第十六派活①，躺了两轮被数字显示揭出来）。
+            "petMax": S.effective_stat(pst[0], plv) * 2 + plv,
+            "wildMax": S.effective_stat(wst[0], wlv) * 2 + wlv,
+            "won": res.won, "exp": res.exp,
+            "rounds": [{"attacker": r.attacker, "move": r.move,
+                        "damage": r.damage, "mult": r.mult,
+                        "label": r.label, "missed": r.missed,
+                        "petHp": r.pet_hp, "wildHp": r.wild_hp}
+                       for r in res.rounds]})
+    # ---- P3 经验条（十七派活）：exp_progress 只读导出 ----
+    # demo 初值选成 win 剧本的 exp 增量恰好跨级 —— 演示 GSC 满格翻 0 升级那一帧。
+    # 全部数值 sim 现算（exp_for_level/exp_progress/exp_to_level），初值只是
+    # 与剧本 seed 同性质的演示常量。
+    win_sc = scenarios[0]                     # win 在前
+    gain = win_sc["exp"]
+    plv = win_sc["playerLevel"]
+    exp0 = S.exp_for_level(plv + 1) - gain    # 战后正好压在升级线上
+    cur0, need0 = S.exp_progress(exp0, plv)
+    exp1 = exp0 + gain
+    lvl1 = S.exp_to_level(exp1)
+    cur1, need1 = S.exp_progress(exp1, lvl1)
+    exp_demo = {
+        "level": plv, "expCur": cur0, "need": need0, "gain": gain,
+        "postLevel": lvl1, "postCur": cur1, "postNeed": need1,
+        "levelUp": lvl1 > plv,
+    }
+    import dataclasses
+    battle = {"scenarios": scenarios, "expDemo": exp_demo,
+              "shake": [dataclasses.asdict(t) for t in E.shake_sequence(6)],
+              "flash": E.flash_sequence(6)}
+    # ---- 共享渲染配方（D77 第 2 步）：P3 主宠 HP 条的绘制矩形 ----
+    # 构建期把 firmware/main/render_scene.h 的配方对每个剧本回合求值，
+    # web 只消费矩形、**零求解逻辑**（不再有 JS 百分比绘制）。
+    # 求值器是 tools/pipeline/scene_cli.c —— 与固件同一份 C 头。
+    battle["sceneP3PetHp"] = _scene_p3_pet_hp(scenarios)
+    battle["sceneP3PetName"] = _scene_p3_pet_name(scenarios)
+
+    # ---- P2 遭遇队列（EncounterQueue 现算样本）----
+    # 拿几条真实遭遇：roll_encounter（S1 生成）→ wild_level/roll_shiny →
+    # 真 EncounterQueue.push —— JS 拿到的就是 sim 队列吐出来的顺序与淘汰
+    q = S.EncounterQueue()
+    APS = [("aa:bb:cc:dd:ee:01", "PokemonGo-Free", -55, "open"),
+           ("aa:bb:cc:dd:ee:02", "Starbucks-5G", -72, "wpa2"),
+           ("aa:bb:cc:dd:ee:03", "eduroam", -48, "wpa2-ent"),
+           ("aa:bb:cc:dd:ee:04", "", -80, "wpa2")]
+    queue_entries = []
+    for i, (bssid, ssid, rssi, auth) in enumerate(APS):
+        enc = S.roll_encounter(bssid, ssid, rssi, auth, ts=1000 + i,
+                               biome="野外", is_transient=(i == 3))
+        qe = S.QueuedEncounter(enc, hp_ratio=100,
+                               is_shiny=S.roll_shiny(bssid, 1000 + i, enc.rarity))
+        q.push(qe)
+        queue_entries.append({"sid": qe.species_id, "rarity": qe.rarity,
+                              "shiny": qe.is_shiny,
+                              "level": S.wild_level(qe.rarity),
+                              "hp": qe.hp_ratio})
+    encounter = {"entries": queue_entries, "generatedBySim": True,
+                 "note": "roll_encounter+wild_level+roll_shiny 现算，"
+                         "经真 EncounterQueue.push；"
+                         "sim 无按键级队列浏览模块，nav 语义按 KEYS"}
+
+    # ---- P4 捕获：窗口/指针/一次投球（S2 现算）----
+    pet = G.PetState()
+    import gameplay as G2
+    enc = G2.Encounter(species_id=19, rarity=2, ts=1234, type_name="一般",
+                       from_bssid_hash=0x1234, biome="野外", is_transient=False)
+    qe = S.QueuedEncounter(enc, hp_ratio=100)
+    balls = []
+    for ball in ("poke", "great", "ultra"):
+        w = S.window_width(45, pet.catch_window_bonus, ball, 100)
+        start = (S.BAR_WIDTH - w) // 2
+        hit_ms = None
+        for ms in range(S.POINTER_PERIOD_MS):
+            if start <= S.pointer_position(ms) <= start + w:
+                hit_ms = ms
+                break
+        r = S.attempt_capture(qe, 45, pet, ball, hit_ms or 0, rng_seed=3)
+        balls.append({"ball": ball, "window": w, "windowStart": start,
+                      "hitMs": hit_ms, "caught": r.caught, "fled": r.fled,
+                      "reason": r.reason})
+    pointer = [S.pointer_position(ms) for ms in range(S.POINTER_PERIOD_MS)]
+    capture = {"balls": balls,
+               "pointer": pointer, "periodMs": S.POINTER_PERIOD_MS,
+               "barWidth": S.BAR_WIDTH}
+
+    # ---- P1/P5 养成轴（gameplay 现算）----
+    pet = G.PetState()
+    pet.advance(7200)                     # 2h 衰减后的真实形态
+    def axes(p):
+        return [round(p.satiety), round(p.mood), round(p.stamina),
+                round(p.intimacy)]
+    base_axes = axes(pet)
+    actions = {}
+    for name, fn in (("feed", lambda: pet.feed()),
+                     ("play", lambda: pet.play()),
+                     ("rest", lambda: pet.rest())):
+        p2 = G.PetState()
+        p2.satiety, p2.mood = pet.satiety, pet.mood
+        p2.stamina, p2.intimacy = pet.stamina, pet.intimacy
+        fn2 = {"feed": p2.feed, "play": p2.play, "rest": p2.rest}[name]
+        fn2()
+        actions[name] = {"before": base_axes, "after": axes(p2)}
+    care = {"axes": base_axes, "axisNames": ["饱食", "心情", "体能", "亲密"],
+            "actions": actions,
+            # P1 顶部信息同样 sim 现算：mood_label 与固件 nurture_mood 同语义、
+            # LOW_THRESHOLD 是「低轴标红」的展示阈值（B 方向用）。
+            # sid/level 是与 P3 剧本一致的展示用主角（皮卡丘 Lv12）。
+            "pet": {"sid": 25, "level": 12, "mood": pet.mood_label,
+                    "despondent": pet.is_despondent,
+                    "low": G.LOW_THRESHOLD}}
+
+    # ---- P6 图鉴网格：导航几何来自 party（仓库=图鉴同一网格）----
+    dex = {"cols": PT.BOX_COLS, "rows": PT.BOX_ROWS,
+           "perPage": PT.BOX_PER_PAGE, "pages": PT.BOX_PAGES,
+           "status": "partial",
+           "note": "网格几何与翻页语义照 party.PartyBrowser（仓库与图鉴"
+                   "同构）；图鉴 seen/caught 位图浏览 sim 无对应模块，"
+                   "只演示导航"}
+
+    stubs = {"P7": "未实现（成绩页）", "P8": "未实现（取名页）"}
+    return {"keys": pages_keys, "hints": hints, "opening": opening,
+            "battle": battle, "encounter": encounter, "capture": capture,
+            "care": care, "dex": dex, "stubs": stubs,
+            "ui": _ui_assets()}
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="构建验收页面")
+    ap.add_argument("--src", default="/tmp/gen1",
+                    help="兼容旧命令；素材转换请先单独运行 convert_gen1.py")
+    ap.add_argument("--assets", default=str(REPO / "assets"),
+                    help="固件 .bin 目录（默认 assets/；其它目录须为相同内容副本）")
+    ap.add_argument("--out", default=str(HERE / "index.html"))
+    args = ap.parse_args()
+
+    assets = pathlib.Path(args.assets)
+    try:
+        require_firmware_assets(assets)
+        inputs = source_manifest()
+    except (OSError, ValueError) as e:
+        print(f"错误：{e}", file=sys.stderr)
+        return 1
+
+    mons = load_data(assets / "gen1.bin")
+    palettes = load_palettes(assets / "palettes.bin")
+    if [m["pal"] for m in mons] != palettes["perMon"]:
+        raise ValueError("gen1.bin 与 palettes.bin 的物种调色板索引不一致")
+    front, seg_meta, front_bytes = load_front(assets / "gen1_front.bin")
+    back, back_size, back_bytes = load_back(assets / "gen1_back.bin")
+    # Art generation can change independently of the preserved gameplay flags.
+    # Infer the display size from each actual FRNT record, never its old hint.
+    for mon in mons:
+        encoded = front.get(mon["id"])
+        if encoded is not None:
+            byte_count = len(base64.b64decode(encoded))
+            sizes = [size for size in FRONT_SIZES if size * size // 4 == byte_count]
+            if len(sizes) != 1:
+                raise ValueError(f'#{mon["id"]} 正面图长度不能确定原生尺寸')
+            mon["fsize"] = sizes[0]
+    sensing = load_sensing(REPO)
+    systems = load_systems(REPO, mons)
+    systems2 = load_systems2(REPO, mons)
+    play = load_playthrough(REPO, mons)
+
+    missing = [m["id"] for m in mons if m["id"] not in front or m["id"] not in back]
+    if missing:
+        print(f"错误：{len(missing)} 只缺 sprite：{missing[:8]}", file=sys.stderr)
+        return 1
+
+    payload = {
+        "meta": {
+            "count": len(mons),
+            "recSize": 32,
+            "dataBytes": (assets / "gen1.bin").stat().st_size,
+            "frontBytes": front_bytes,
+            "backBytes": back_bytes,
+            "backSize": back_size,
+            "segs": seg_meta,
+        },
+        "palettes": palettes,
+        "sensing": sensing,
+        "systems": systems,
+        "sys2": systems2,
+        "play": play,
+        "mons": mons,
+        "front": {str(k): v for k, v in sorted(front.items())},
+        "back": {str(k): v for k, v in sorted(back.items())},
+        "simPages": sim_pages_payload(),
+        "moveTypes": _move_types(),
+    }
+
+    tpl = (HERE / "template.html").read_text(encoding="utf-8")
+    if tpl.count("ASSETS_JSON") != 1 or tpl.count("/*KANTO16CSS*/") != 1:
+        print("错误：template.html 的资产 / 字体占位符缺失或重复", file=sys.stderr)
+        return 1
+
+    # Kanto16 点阵字体（第十一派活）：font16.bin → 位图 TTF → data URI @font-face。
+    # 字体与固件同源是正式预览的必要条件；不输出宿主字体回退产物。
+    kanto_css = ""
+    kanto_chars = ""
+    try:
+        sys.path.insert(0, str(HERE))
+        from make_font import build_kanto16, read_font16
+        kanto_css, kmeta = build_kanto16()
+        _, _glyphs = read_font16()
+        kanto_chars = "".join(chr(cp) for cp in sorted(_glyphs))
+        payload["kantoChars"] = kanto_chars
+        print(f"  Kanto16：{kmeta['chars']} 字形 {kmeta['bytes']}B → data URI 内嵌")
+    except ImportError as e:
+        print(f"错误：Kanto16 缺少构建依赖（需要 fontTools）：{e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"错误：Kanto16 生成失败：{e}", file=sys.stderr)
+        return 1
+
+    if not kanto_css or not kanto_chars:
+        print("错误：Kanto16 字形 / CSS 为空", file=sys.stderr)
+        return 1
+    if source_manifest() != inputs:
+        print("错误：构建期间生成输入发生变化，请待修改完成后重新构建", file=sys.stderr)
+        return 1
+    payload["buildManifest"] = {
+        "version": 1, "inputs": inputs,
+        "payloadSha256": payload_hash(payload),
+        "fontCssSha256": hashlib.sha256(kanto_css.encode()).hexdigest(),
+    }
+    html = tpl.replace("/*KANTO16CSS*/", FONT_BEGIN + kanto_css + FONT_END).replace(
+        "ASSETS_JSON",
+        json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+    out = pathlib.Path(args.out)
+    out.write_text(html, encoding="utf-8")
+
+    total = payload["meta"]["dataBytes"] + front_bytes + back_bytes
+    print(f"\n{out}  {out.stat().st_size/1024:.0f} KB")
+    print(f"  {len(mons)} 只　front {len(front)}　back {len(back)}")
+    print(f"  资产合计 {total/1024:.1f} KB（占 8MB 的 {total/8/1024/1024*100:.2f}%）")
+    if systems and systems.get("s1", {}).get("stat"):
+        st = systems["s1"]["stat"]
+        print(f"  系统 S1: {st['scans']} 次扫描 → 队列 {len(systems['s1']['queue'])} 条"
+              f"（猎场{st['hunt']} 基地{st['base']}）{st['bytes']} B")
+    if systems2:
+        print(f"  S4 饱食归零 {systems2['s4']['satZeroHour']}h　"
+              f"S5 图鉴 {systems2['s5']['bytes']} B/{systems2['s5']['pages']} 页　"
+              f"S6 存档 {systems2['s6']['total']} B")
+        pr = systems2['s7']['probes']
+        npass = sum(1 for x in pr if x['pass'])
+        print(f"  S7 进化样本 {len(systems2['s7']['samples'])} 只"
+              f"（{systems2['s7']['counts']}）　判定探针 {npass}/{len(pr)}"
+              f"{' ✓' if npass == len(pr) else ' ✗ 有探针与期望不符'}")
+        for x in pr:
+            if not x['pass']:
+                print(f"    ✗ #{x['id']} {x['zh']} 期望 {x['want']} 实得 "
+                      f"{x['ok']}：{x['why']}", file=sys.stderr)
+        print(f"  S11 开场 {systems2['s11']['frames']} 帧　"
+              f"音效帧 {[x['f'] for x in systems2['s11']['sounds']]}")
+        if systems2.get("s14"):
+            q = systems2["s14"]
+            print(f"  S14 队伍 {len(q['party'])}/{q['partyMax']}　"
+                  f"仓库 {len(q['box'])}/{q['boxSpecies']}　{q['bytes']} B　"
+                  f"重复物种 {len(q['dups'])} 种")
+        if systems2.get("s15"):
+            g = systems2["s15"]
+            sh, ev = g["shiny"], g["evolve"]
+            offs = [(x["dx"], x["dy"]) for x in sh["stars"]]
+            want = [(16, 0), (11, 11), (0, 16), (-11, 11),
+                    (-16, 0), (-11, -11), (0, -16), (11, -11)]
+            print(f"  S15 闪光 {sh['total']} 帧 8 颗星 r={sh['radius']}"
+                  f"　偏移对齐反汇编 {'✓' if offs == want else '✗'}")
+            print(f"      转场 {len(g['transitions'])} 种（确定性 3-bit 查表）"
+                  f"　进化闪烁 {ev['blinkFrames']} 帧"
+                  f"{'✓' if ev['blinkFrames'] == 288 else ' ✗ 应为 288'}"
+                  f"　{len(ev['rounds'])} 轮加速")
+        if systems2.get("s13"):
+            b = systems2["s13"]["budget"]
+            worst = max(systems2["s13"]["metrics"].items(),
+                        key=lambda kv: abs(kv[1]["dc"]))
+            print(f"  S13 音频 {len(systems2['s13']['sfx'])} 条音效　"
+                  f"{b['total_bytes']} B（PCM 要 {b['as_pcm_bytes']//1024} KB，"
+                  f"省 {b['as_pcm_bytes']//b['total_bytes']}×）")
+            print(f"      最大直流偏移 {worst[0]} {worst[1]['dc']:+.5f}"
+                  f"{' ✓' if abs(worst[1]['dc']) < 0.01 else ' ✗ 需去直流'}")
+    if sensing:
+        for name, d in sensing.items():
+            w1, w4 = d["runs"]["1"], d["runs"]["4"]
+            print(f"  感知层 {name}: {d['scans']} 次扫描　"
+                  f"窗口1 转换{w1['trans']}/移动{w1['moving']}　"
+                  f"窗口4 转换{w4['trans']}/移动{w4['moving']}")
+    print(f"\n启动：./tools/inspector/serve.sh")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
