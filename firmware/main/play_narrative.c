@@ -29,7 +29,7 @@ static void refresh(void){world_narrative_snapshot(&context);}
 static const narrative_page_t *current(void){return script&&page<narrative_pages(scene)?&script->page[page]:NULL;}
 static bool choosing(void){return view==DIALOG&&script->choices&&page+1==narrative_pages(scene);}
 static unsigned chars(const char *s){unsigned n=0;for(;s&&*s;s++)if(((uint8_t)*s&0xc0)!=0x80)n++;return n;}
-static unsigned visible(void){return complete_text?256:clock_state.elapsed_ms>300?(clock_state.elapsed_ms-300)/35:0;}
+static unsigned visible(void){return complete_text?256:clock_state.elapsed_ms>300?(clock_state.elapsed_ms-300)/20:0;}
 static unsigned text_length(void){const narrative_page_t *p=current();return p?chars(p->line[0])+chars(p->line[1])+chars(p->line[2]):0;}
 static void prefix(char out[64],const char *s,unsigned n){unsigned bytes=0;while(s&&s[bytes]&&n){bytes++;while(((uint8_t)s[bytes]&0xc0)==0x80)bytes++;n--;}if(bytes>63)bytes=63;memcpy(out,s,bytes);out[bytes]=0;}
 static void rect(int band,int x,int y,int w,int h,uint16_t c){int lo=y>band?y:band,hi=y+h<band+SCREEN_BAND_H?y+h:band+SCREEN_BAND_H;for(int yy=lo;yy<hi;yy++)for(int xx=x;xx<x+w;xx++)screen_px(xx,yy-band,c);}
